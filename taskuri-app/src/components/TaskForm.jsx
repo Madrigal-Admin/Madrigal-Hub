@@ -1,0 +1,199 @@
+import { useMemo, useState } from 'react'
+import { supabase } from '../supabaseClient'
+import { PRIORITATI, inputCls, labelCls, mesajEroare } from '../lib/ui'
+import AngajatiPicker from './AngajatiPicker'
+import { Modal } from './Mici'
+
+// Creare / editare task. La editare, tipul și evenimentul nu se mai pot schimba.
+export default function TaskForm({ ctx, task, evenimentImplicit, onClose, onSaved }) {
+  const editare = !!task
+  const tipuriPosibile = [ctx.poateEveniment && 'eveniment', ctx.poateOperational && 'operational'].filter(Boolean)
+
+  const evenimenteAlegere = useMemo(
+    () =>
+      (ctx.admin ? ctx.evenimente : ctx.evenimenteMele)
+        .filter((e) => ctx.comportament(e.id) !== 'anulat')
+        .sort((a, b) => (a.data || '').localeCompare(b.data || '')),
+    [ctx]
+  )
+  const grupuriAlegere = ctx.grupuri.filter((g) => g.activ && (ctx.admin || ctx.grupuriCoordonate.has(g.id)))
+
+  const [f, setF] = useState(() => ({
+    tip: task?.tip || (evenimentImplicit ? 'eveniment' : tipuriPosibile[0]),
+    titlu: task?.titlu || '',
+    descriere: task?.descriere || '',
+    eveniment_id: task?.eveniment_id || evenimentImplicit || '',
+    grup_id: task?.grup_id || (grupuriAlegere.length === 1 ? grupuriAlegere[0].id : ''),
+    responsabil: task?.responsabil_id ? [task.responsabil_id] : [],
+    colaboratori: task ? ctx.colabDupaTask[task.id] || [] : [],
+    termen: task?.termen || '',
+    prioritate: task?.prioritate || 'medie',
+    link_document: task?.link_document || '',
+  }))
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const set = (k, v) => setF((p) => ({ ...p, [k]: v }))
+
+  // Taskul operațional al unui coordonator (nu admin) poate merge doar la oameni din departamentul lui.
+  const optiuniResponsabil = useMemo(() => {
+    let lista = ctx.angajatiCuAcces
+    if (f.tip === 'operational' && f.grup_id && !ctx.admin) {
+      const ids = new Set(ctx.membri.filter((m) => m.grup_id === f.grup_id).map((m) => m.angajat_id))
+      lista = lista.filter((a) => ids.has(a.id))
+    }
+    return lista
+  }, [ctx, f.tip, f.grup_id])
+
+  async function salveaza(e) {
+    e.preventDefault()
+    setError('')
+    if (!f.titlu.trim()) return setError('Scrie titlul taskului.')
+    if (f.tip === 'eveniment' && !f.eveniment_id) return setError('Alege evenimentul.')
+    if (f.tip === 'operational' && !f.grup_id && !ctx.admin) return setError('Alege departamentul.')
+    if (f.link_document.trim() && !/^https?:\/\/\S+$/i.test(f.link_document.trim())) {
+      return setError('Linkul trebuie să înceapă cu http:// sau https://.')
+    }
+    setBusy(true)
+    const date = {
+      titlu: f.titlu.trim(),
+      descriere: f.descriere.trim() || null,
+      responsabil_id: f.responsabil[0] || null,
+      termen: f.termen || null,
+      prioritate: f.prioritate,
+      link_document: f.link_document.trim() || null,
+      ...(f.tip === 'operational' ? { grup_id: f.grup_id || null } : {}),
+    }
+    let id = task?.id
+    if (editare) {
+      const { error: err } = await supabase.from('tsk_taskuri').update(date).eq('id', id)
+      if (err) { setBusy(false); return setError(mesajEroare(err)) }
+    } else {
+      const { data, error: err } = await supabase
+        .from('tsk_taskuri')
+        .insert({ ...date, tip: f.tip, eveniment_id: f.tip === 'eveniment' ? f.eveniment_id : null, creat_de: ctx.me.id })
+        .select('id')
+        .single()
+      if (err) { setBusy(false); return setError(mesajEroare(err)) }
+      id = data.id
+    }
+
+    // colaboratori: adaug ce lipsește, scot ce nu mai e
+    const vechi = new Set(task ? ctx.colabDupaTask[task.id] || [] : [])
+    const noi = new Set(f.colaboratori)
+    const deAdaugat = [...noi].filter((x) => !vechi.has(x))
+    const deScos = [...vechi].filter((x) => !noi.has(x))
+    if (deAdaugat.length) {
+      const { error: err } = await supabase.from('tsk_colaboratori').insert(deAdaugat.map((angajat_id) => ({ task_id: id, angajat_id })))
+      if (err) { setBusy(false); await onSaved(); return setError('Taskul s-a salvat, dar colaboratorii nu: ' + mesajEroare(err, 'eroare necunoscută')) }
+    }
+    if (deScos.length) await supabase.from('tsk_colaboratori').delete().eq('task_id', id).in('angajat_id', deScos)
+    setBusy(false)
+    await onSaved()
+  }
+
+  if (tipuriPosibile.length === 0 && !editare) {
+    return (
+      <Modal titlu="Task nou" onClose={onClose}>
+        <p className="text-sm text-slate-600">Nu poți crea taskuri: nu ești PM la niciun eveniment și nici coordonator de departament.</p>
+      </Modal>
+    )
+  }
+
+  return (
+    <Modal titlu={editare ? 'Editează taskul' : 'Task nou'} onClose={onClose}>
+      <form onSubmit={salveaza} className="space-y-4">
+        {!editare && tipuriPosibile.length > 1 && !evenimentImplicit && (
+          <div>
+            <label className={labelCls}>Tip task</label>
+            <div className="flex gap-2">
+              {[['eveniment', 'Task de eveniment'], ['operational', 'Task operațional']].filter(([k]) => tipuriPosibile.includes(k)).map(([k, l]) => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => set('tip', k)}
+                  className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium ${f.tip === k ? 'border-accent bg-indigo-50 text-accent' : 'border-slate-200 text-slate-600'}`}
+                >
+                  {l}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div>
+          <label className={labelCls}>Titlu *</label>
+          <input className={inputCls} value={f.titlu} onChange={(e) => set('titlu', e.target.value)} />
+        </div>
+
+        {f.tip === 'eveniment' ? (
+          <div>
+            <label className={labelCls}>Eveniment *</label>
+            <select className={inputCls} value={f.eveniment_id} disabled={editare || !!evenimentImplicit} onChange={(e) => set('eveniment_id', e.target.value)}>
+              <option value="">— alege evenimentul —</option>
+              {evenimenteAlegere.map((e) => (
+                <option key={e.id} value={e.id}>{e.nume}</option>
+              ))}
+            </select>
+          </div>
+        ) : (
+          <div>
+            <label className={labelCls}>Departament {ctx.admin ? '(opțional)' : '*'}</label>
+            <select className={inputCls} value={f.grup_id} onChange={(e) => set('grup_id', e.target.value)}>
+              <option value="">{ctx.admin ? '— fără departament —' : '— alege departamentul —'}</option>
+              {grupuriAlegere.map((g) => (
+                <option key={g.id} value={g.id}>{g.nume}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <div>
+          <label className={labelCls}>Descriere</label>
+          <textarea className={inputCls} rows={3} value={f.descriere} onChange={(e) => set('descriere', e.target.value)} />
+        </div>
+
+        <div>
+          <label className={labelCls}>Responsabil</label>
+          <AngajatiPicker single angajati={optiuniResponsabil} valoare={f.responsabil} onChange={(v) => set('responsabil', v)} />
+          <p className="mt-1 text-xs text-slate-400">
+            Apar doar angajații care au acces la Taskuri
+            {f.tip === 'operational' && !ctx.admin ? ' și fac parte din departament' : ''}.
+          </p>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label className={labelCls}>Termen</label>
+            <input type="date" className={inputCls} value={f.termen} onChange={(e) => set('termen', e.target.value)} />
+          </div>
+          <div>
+            <label className={labelCls}>Prioritate</label>
+            <select className={inputCls} value={f.prioritate} onChange={(e) => set('prioritate', e.target.value)}>
+              {PRIORITATI.map((p) => (
+                <option key={p.cod} value={p.cod}>{p.nume}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label className={labelCls}>Link către document (opțional)</label>
+          <input className={inputCls} placeholder="https://…" value={f.link_document} onChange={(e) => set('link_document', e.target.value)} />
+        </div>
+
+        <div>
+          <label className={labelCls}>Colaboratori (opțional)</label>
+          <AngajatiPicker angajati={ctx.angajatiCuAcces.filter((a) => a.id !== f.responsabil[0])} valoare={f.colaboratori} onChange={(v) => set('colaboratori', v)} />
+        </div>
+
+        {error && <p className="text-sm text-rose-600">{error}</p>}
+        <div className="flex justify-end gap-2">
+          <button type="button" onClick={onClose} className="rounded-lg px-4 py-2 text-sm text-slate-600 hover:bg-slate-100">Renunță</button>
+          <button type="submit" disabled={busy} className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50">
+            {busy ? 'Se salvează…' : 'Salvează'}
+          </button>
+        </div>
+      </form>
+    </Modal>
+  )
+}

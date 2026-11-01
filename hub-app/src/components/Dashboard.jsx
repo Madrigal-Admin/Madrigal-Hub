@@ -37,6 +37,12 @@ const TOOLS = [
     description: 'Referate de necesitate și deconturi de cheltuieli.',
     href: '/financiar/',
   },
+  {
+    tool: 'taskuri',
+    name: 'Taskuri',
+    description: 'Taskuri de eveniment și operaționale, checklist de organizare.',
+    href: '/taskuri/',
+  },
 ]
 
 export default function Dashboard({ angajat, accesTooluri, isHubAdmin, onOpenAdmin, onOpenCalendar, canSeeStatistici, onOpenStatistici, onSignOut }) {
