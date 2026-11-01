@@ -8,7 +8,7 @@ const TOOLS = [
   { key: 'hr', label: 'HR', roles: ['angajat', 'operational', 'full'] },
   { key: 'invitatii', label: 'Invitații', roles: ['full', 'checkin'] },
   { key: 'administrativ', label: 'Administrativ', roles: ['full', 'angajat'] },
-  { key: 'calendar', label: 'Calendar', roles: ['admin'] },
+  { key: 'calendar', label: 'Calendar', roles: ['admin', 'statistici'] },
   {
     key: 'rapoarte',
     label: 'Rapoarte',
@@ -19,6 +19,7 @@ const TOOLS = [
 
 const ROLE_LABELS = {
   admin: 'Admin',
+  statistici: 'Doar statistici evenimente',
   angajat: 'Angajat',
   operational: 'Operațional',
   full: 'Admin complet',

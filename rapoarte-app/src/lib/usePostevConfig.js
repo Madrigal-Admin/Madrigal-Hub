@@ -8,15 +8,20 @@ export function usePostevConfig() {
   useEffect(() => {
     let activ = true
     Promise.all([
-      supabase.from('rap_tipuri').select('*').order('ordine'),
+      supabase.from('tipuri_eveniment').select('*').order('ordine'),
+      supabase.from('rap_tipuri').select('cod, prioritate'),
       supabase.from('rap_postev_campuri').select('*').order('ordine'),
       supabase.from('rap_postev_campuri_tipuri').select('*'),
       supabase.from('angajati').select('id, nume_complet, activ').order('nume_complet'),
-    ]).then(([t, c, m, a]) => {
+    ]).then(([t, rt, c, m, a]) => {
       if (!activ) return
       setCfg({
         loading: false,
-        tipuri: t.data || [],
+        // numele, culoarea și starea tipurilor vin din Calendar; Rapoarte adaugă doar prioritatea
+        tipuri: (t.data || []).map((x) => ({
+          ...x,
+          prioritate: (rt.data || []).find((r) => r.cod === x.cod)?.prioritate ?? 4,
+        })),
         campuri: c.data || [],
         matrice: m.data || [],
         angajati: a.data || [],

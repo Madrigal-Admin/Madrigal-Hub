@@ -9,12 +9,10 @@ export const normalizeaza = (s) => (s ?? '').toString().trim().toLowerCase()
 
 export const azi = () => new Date().toISOString().slice(0, 10)
 
-// Tipurile care se potrivesc cu etichetele din calendar (ClickUp)
-export function tipuriDinTaguri(tags, tipuri) {
-  const set = new Set((tags || []).map(normalizeaza))
-  return tipuri
-    .filter((t) => t.activ && t.eticheta_clickup && set.has(normalizeaza(t.eticheta_clickup)))
-    .map((t) => t.cod)
+// Tipurile evenimentului din calendar, doar cele active în Rapoarte
+export function tipuriDinEveniment(eveniment, tipuri) {
+  const active = new Set(tipuri.filter((t) => t.activ).map((t) => t.cod))
+  return (eveniment?.tipuri || []).filter((cod) => active.has(cod))
 }
 
 // Câmpurile specifice care apar pentru combinația aleasă (reuniunea câmpurilor

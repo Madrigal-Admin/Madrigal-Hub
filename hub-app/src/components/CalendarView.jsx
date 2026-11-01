@@ -1,28 +1,21 @@
 import { useEffect, useMemo, useState } from 'react'
-import { LogOut, RefreshCw, ChevronLeft, ChevronRight, ArrowLeft, Settings, X as XIcon } from 'lucide-react'
+import { LogOut, ChevronLeft, ChevronRight, ArrowLeft, Settings, Plus, Pencil } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import SiteHeader from './SiteHeader'
 import SiteFooter from './SiteFooter'
+import EvenimentForm from './EvenimentForm'
+import ListeEvenimente from './ListeEvenimente'
+import {
+  IMPLICARE_CULORI, ZILE_SAPT, LUNI, formatData, ymd, formatOra, zileEveniment, culoareText, initiale, incarcaTot,
+} from '../lib/evenimente'
 
-// Culorile sunt cele din ClickUp (c = culoarea din ClickUp, text = variantă mai
-// închisă, ca să se citească bine pe fundalul deschis).
-const STATUS_LABELS = {
-  deschis: { label: 'Deschis', c: '#87909e', text: '#5b6573' },
-  'in organizare': { label: 'În organizare', c: '#f76808', text: '#c2570a' },
-  anulat: { label: 'Anulat', c: '#e5484d', text: '#c4262b' },
-  finalizat: { label: 'Finalizat', c: '#008844', text: '#006b35' },
-}
-const IMPLICARE_CULORI = {
-  Organizator: { c: '#f76808', text: '#c2570a' },
-  Partener: { c: '#ffc53d', text: '#8a6200' },
-  Invitat: { c: '#30a46c', text: '#1f7a52' },
-}
+const CULOARE_NECUNOSCUT = '#94a3b8'
 
-function Chip({ c, text, children }) {
+function Chip({ c, children, taiat }) {
   return (
     <span
-      className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium whitespace-nowrap"
-      style={{ backgroundColor: `${c}26`, color: text }}
+      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium whitespace-nowrap ${taiat ? 'line-through' : ''}`}
+      style={{ backgroundColor: `${c}26`, color: culoareText(c) }}
     >
       <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: c }} />
       {children}
@@ -30,134 +23,69 @@ function Chip({ c, text, children }) {
   )
 }
 
-// "19:00" sau "19:00–21:00"; nimic dacă n-ai setat ora în ClickUp.
-function formatOra(e) {
-  if (!e.ora_inceput) return ''
-  return e.ora_sfarsit && e.ora_sfarsit !== e.ora_inceput ? `${e.ora_inceput}–${e.ora_sfarsit}` : e.ora_inceput
-}
-
-const ZILE_SAPT = ['Lun', 'Mar', 'Mie', 'Joi', 'Vin', 'Sâm', 'Dum']
-const LUNI = [
-  'Ianuarie', 'Februarie', 'Martie', 'Aprilie', 'Mai', 'Iunie',
-  'Iulie', 'August', 'Septembrie', 'Octombrie', 'Noiembrie', 'Decembrie',
-]
-const CULORI_PRESTABILITE = ['#7F77DD', '#1D9E75', '#D85A30', '#D4537E', '#378ADD', '#BA7517', '#639922', '#5F5E5A']
-
-function formatData(dataStr) {
-  if (!dataStr) return '—'
-  return new Date(dataStr).toLocaleDateString('ro-RO', { day: 'numeric', month: 'long', year: 'numeric' })
-}
-
-// Data locală (nu UTC) — altfel, în România, ziua apărea mutată cu o zi.
-function ymd(date) {
-  const a = date.getFullYear()
-  const l = String(date.getMonth() + 1).padStart(2, '0')
-  const z = String(date.getDate()).padStart(2, '0')
-  return `${a}-${l}-${z}`
-}
-
-// Toate zilele unui eveniment, de la început la sfârșit (max 60 de zile).
-function zileEveniment(e) {
-  if (!e.data) return []
-  const start = e.data
-  let end = e.data_sfarsit && e.data_sfarsit >= e.data ? e.data_sfarsit : e.data
-  const zile = []
-  const cursor = new Date(Date.UTC(+start.slice(0, 4), +start.slice(5, 7) - 1, +start.slice(8, 10)))
-  for (let i = 0; i < 60; i++) {
-    const d = cursor.toISOString().slice(0, 10)
-    if (d > end) break
-    zile.push(d)
-    cursor.setUTCDate(cursor.getUTCDate() + 1)
-  }
-  return zile
-}
-
-function initialeTag(tag) {
-  const cuvinte = tag.trim().split(/\s+/)
-  if (cuvinte.length === 1) return cuvinte[0].slice(0, 3).toUpperCase()
-  return cuvinte.slice(0, 2).map((c) => c[0]).join('').toUpperCase()
-}
-
-export default function CalendarView({ angajat, canManageCalendar, session, onBack, onSignOut }) {
-  const [evenimente, setEvenimente] = useState([])
-  const [tagCulori, setTagCulori] = useState({}) // { tag: '#hex' }
-  const [tagFilter, setTagFilter] = useState(null) // null = toate active; altfel Set<string>
-  const [showTagManager, setShowTagManager] = useState(false)
+export default function CalendarView({ angajat, canManageCalendar, onBack, onSignOut }) {
+  const [date, setDate] = useState({ evenimente: [], tipuri: [], statusuri: [], angajati: [] })
+  const [eroare, setEroare] = useState('')
   const [loading, setLoading] = useState(true)
-  const [syncing, setSyncing] = useState(false)
-  const [syncMessage, setSyncMessage] = useState('')
+  const [tipFilter, setTipFilter] = useState(null) // null = toate; altfel Set<cod>
+  const [statusFilter, setStatusFilter] = useState('')
+  const [localitateFilter, setLocalitateFilter] = useState('')
+  const [formDeschis, setFormDeschis] = useState(null) // null | 'nou' | eveniment
+  const [showListe, setShowListe] = useState(false)
   const [lunaCurenta, setLunaCurenta] = useState(() => {
     const azi = new Date()
     return new Date(azi.getFullYear(), azi.getMonth(), 1)
   })
   const [ziuaSelectata, setZiuaSelectata] = useState(null)
 
+  const { evenimente, tipuri, statusuri, angajati } = date
+
   useEffect(() => {
     load()
   }, [])
 
   async function load() {
-    setLoading(true)
-    const [{ data: ev }, { data: culori }] = await Promise.all([
-      supabase.from('evenimente').select('*').order('data', { ascending: true }),
-      supabase.from('evenimente_tag_culori').select('*'),
-    ])
-    setEvenimente(ev || [])
-    setTagCulori(Object.fromEntries((culori || []).map((c) => [c.tag, c.culoare])))
+    const r = await incarcaTot()
+    setEroare(r.eroare)
+    setDate({ evenimente: r.evenimente, tipuri: r.tipuri, statusuri: r.statusuri, angajati: r.angajati })
     setLoading(false)
   }
 
-  const toateTagurile = useMemo(() => {
-    const set = new Set()
-    for (const e of evenimente) for (const t of e.tags || []) set.add(t)
-    return [...set].sort()
-  }, [evenimente])
+  const tipDupaCod = useMemo(() => Object.fromEntries(tipuri.map((t) => [t.cod, t])), [tipuri])
+  const statusDupaCod = useMemo(() => Object.fromEntries(statusuri.map((s) => [s.cod, s])), [statusuri])
+  const numeAngajat = useMemo(() => Object.fromEntries(angajati.map((a) => [a.id, a.nume_complet])), [angajati])
 
-  const tagActive = tagFilter === null ? new Set(toateTagurile) : tagFilter
+  const localitati = useMemo(
+    () => [...new Set(evenimente.map((e) => (e.localitate || '').trim()).filter(Boolean))].sort(),
+    [evenimente]
+  )
 
-  function toggleTagFilter(tag) {
-    setTagFilter((prev) => {
-      const curent = prev === null ? new Set(toateTagurile) : new Set(prev)
-      if (curent.has(tag)) curent.delete(tag)
-      else curent.add(tag)
+  const tipuriActive = tipFilter === null ? new Set(tipuri.map((t) => t.cod)) : tipFilter
+
+  function toggleTipFilter(cod) {
+    setTipFilter((prev) => {
+      const curent = prev === null ? new Set(tipuri.map((t) => t.cod)) : new Set(prev)
+      if (curent.has(cod)) curent.delete(cod)
+      else curent.add(cod)
       return curent
     })
   }
 
-  async function handleSync() {
-    setSyncing(true)
-    setSyncMessage('')
-    try {
-      const res = await fetch('/.netlify/functions/sync-clickup', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      })
-      const result = await res.json()
-      if (!res.ok) {
-        setSyncMessage(result.error || 'Sincronizarea a eșuat.')
-      } else {
-        setSyncMessage(
-          `${result.sincronizate} evenimente sincronizate.` +
-            (result.orfaneSterse > 0 ? ` ${result.orfaneSterse} orfane (șterse din ClickUp) au fost curățate.` : '')
-        )
-        load()
-      }
-    } catch {
-      setSyncMessage('Nu am putut contacta funcția de sincronizare.')
-    }
-    setSyncing(false)
-  }
-
   async function toggleFlag(id, field, value) {
-    setEvenimente((prev) => prev.map((e) => (e.id === id ? { ...e, [field]: value } : e)))
+    setDate((prev) => ({ ...prev, evenimente: prev.evenimente.map((e) => (e.id === id ? { ...e, [field]: value } : e)) }))
     await supabase.from('evenimente').update({ [field]: value }).eq('id', id)
   }
 
-  // Evenimentele fără taguri rămân mereu vizibile — filtrul se aplică
-  // doar celor cu cel puțin un tag.
+  // Evenimentele fără niciun tip rămân mereu vizibile — filtrul de tip se aplică doar celor cu tip.
   const evenimenteVizibile = useMemo(
-    () => evenimente.filter((e) => !e.tags?.length || e.tags.some((t) => tagActive.has(t))),
-    [evenimente, tagActive]
+    () =>
+      evenimente.filter(
+        (e) =>
+          (!e.tipuri.length || e.tipuri.some((c) => tipuriActive.has(c))) &&
+          (!statusFilter || e.status === statusFilter) &&
+          (!localitateFilter || (e.localitate || '').trim() === localitateFilter)
+      ),
+    [evenimente, tipuriActive, statusFilter, localitateFilter]
   )
 
   const evenimenteByDate = useMemo(() => {
@@ -174,15 +102,12 @@ export default function CalendarView({ angajat, canManageCalendar, session, onBa
   const zileGrila = useMemo(() => {
     const primaZi = new Date(lunaCurenta.getFullYear(), lunaCurenta.getMonth(), 1)
     const ultimaZi = new Date(lunaCurenta.getFullYear(), lunaCurenta.getMonth() + 1, 0)
-
     const offsetStart = (primaZi.getDay() + 6) % 7
     const start = new Date(primaZi)
     start.setDate(start.getDate() - offsetStart)
-
     const offsetEnd = (7 - ((ultimaZi.getDay() + 6) % 7) - 1) % 7
     const end = new Date(ultimaZi)
     end.setDate(end.getDate() + offsetEnd)
-
     const zile = []
     const cursor = new Date(start)
     while (cursor <= end) {
@@ -203,6 +128,11 @@ export default function CalendarView({ angajat, canManageCalendar, session, onBa
   function schimbaLuna(delta) {
     setLunaCurenta((prev) => new Date(prev.getFullYear(), prev.getMonth() + delta, 1))
     setZiuaSelectata(null)
+  }
+
+  function dupaSalvare() {
+    setFormDeschis(null)
+    load()
   }
 
   return (
@@ -230,53 +160,69 @@ export default function CalendarView({ angajat, canManageCalendar, session, onBa
           <ArrowLeft size={15} />
           Înapoi la Hub
         </button>
+
+        {eroare && <p className="mb-4 text-sm text-rose-600">{eroare}</p>}
+
         {canManageCalendar && (
           <div className="mb-5 flex flex-wrap items-center gap-3 bg-white rounded-xl shadow-sm p-4">
             <button
-              onClick={handleSync}
-              disabled={syncing}
-              className="flex items-center gap-2 bg-accent hover:bg-accent-hover text-white text-sm font-medium px-4 py-2 rounded-lg transition disabled:opacity-50"
+              onClick={() => setFormDeschis('nou')}
+              className="flex items-center gap-2 bg-accent hover:bg-accent-hover text-white text-sm font-medium px-4 py-2 rounded-lg transition"
             >
-              <RefreshCw size={15} className={syncing ? 'animate-spin' : ''} />
-              {syncing ? 'Se sincronizează...' : 'Sincronizează evenimente'}
+              <Plus size={15} /> Eveniment nou
             </button>
-            <p className="text-xs text-slate-400">Automat, în fiecare luni.</p>
-            {syncMessage && <p className="text-sm text-slate-500">{syncMessage}</p>}
+            <button
+              onClick={() => setShowListe(true)}
+              className="flex items-center gap-2 rounded-lg bg-slate-100 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 transition"
+            >
+              <Settings size={15} /> Tipuri și statusuri
+            </button>
           </div>
         )}
 
-        {toateTagurile.length > 0 && (
-          <div className="mb-5 flex flex-wrap items-center gap-2 bg-white rounded-xl shadow-sm p-3">
-            <span className="text-xs font-medium text-slate-500 mr-1">Taguri:</span>
-            {toateTagurile.map((tag) => {
-              const activ = tagActive.has(tag)
-              const culoare = tagCulori[tag] || '#94a3b8'
+        <div className="mb-5 flex flex-wrap items-center gap-2 bg-white rounded-xl shadow-sm p-3">
+          <span className="text-xs font-medium text-slate-500 mr-1">Tipuri:</span>
+          {tipuri
+            .filter((t) => t.activ || evenimente.some((e) => e.tipuri.includes(t.cod)))
+            .map((t) => {
+              const activ = tipuriActive.has(t.cod)
               return (
                 <button
-                  key={tag}
-                  onClick={() => toggleTagFilter(tag)}
+                  key={t.cod}
+                  onClick={() => toggleTipFilter(t.cod)}
                   className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition"
-                  style={{
-                    backgroundColor: activ ? `${culoare}22` : '#f1f5f9',
-                    color: activ ? culoare : '#94a3b8',
-                  }}
+                  style={{ backgroundColor: activ ? `${t.culoare}22` : '#f1f5f9', color: activ ? culoareText(t.culoare) : '#94a3b8' }}
                 >
-                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: activ ? culoare : '#cbd5e1' }} />
-                  {tag}
+                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: activ ? t.culoare : '#cbd5e1' }} />
+                  {t.nume}
                 </button>
               )
             })}
-            {canManageCalendar && (
-              <button
-                onClick={() => setShowTagManager(true)}
-                title="Gestionează culorile tagurilor"
-                className="ml-auto rounded-full bg-slate-100 p-1.5 text-slate-500 hover:bg-slate-200"
-              >
-                <Settings size={13} />
-              </button>
-            )}
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600"
+              aria-label="Filtru status"
+            >
+              <option value="">Toate statusurile</option>
+              {statusuri.map((s) => (
+                <option key={s.cod} value={s.cod}>{s.nume}</option>
+              ))}
+            </select>
+            <select
+              value={localitateFilter}
+              onChange={(e) => setLocalitateFilter(e.target.value)}
+              className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600"
+              aria-label="Filtru localitate"
+            >
+              <option value="">Toate localitățile</option>
+              {localitati.map((l) => (
+                <option key={l} value={l}>{l}</option>
+              ))}
+            </select>
           </div>
-        )}
+        </div>
 
         {loading ? (
           <p className="text-sm text-slate-400">Se încarcă...</p>
@@ -309,44 +255,45 @@ export default function CalendarView({ angajat, canManageCalendar, session, onBa
                   const esteAzi = dataStr === azi
                   const esteSelectata = dataStr === ziuaSelectata
 
-                  const multiZi = evZi.some((e) => e.data_sfarsit && e.data_sfarsit > e.data)
-                  const culoareInterval = multiZi
-                    ? tagCulori[evZi.find((e) => e.data_sfarsit && e.data_sfarsit > e.data)?.tags?.[0]] || '#94a3b8'
-                    : null
+                  const evMultiZi = evZi.find((e) => e.data_sfarsit && e.data_sfarsit > e.data)
+                  const culoareInterval = evMultiZi ? tipDupaCod[evMultiZi.tipuri[0]]?.culoare || CULOARE_NECUNOSCUT : null
 
-                  const tagurileZilei = [...new Set(evZi.flatMap((e) => (e.tags?.length ? e.tags : ['__fără_tag__'])))]
+                  const tipurileZilei = [...new Set(evZi.flatMap((e) => (e.tipuri.length ? e.tipuri : ['__fara_tip__'])))]
 
                   return (
                     <button
                       key={dataStr}
                       onClick={() => setZiuaSelectata(esteSelectata ? null : dataStr)}
-                      style={multiZi && !esteSelectata ? { backgroundColor: `${culoareInterval}1f` } : undefined}
+                      style={evMultiZi && !esteSelectata ? { backgroundColor: `${culoareInterval}1f` } : undefined}
                       className={`aspect-square rounded-lg flex flex-col items-center justify-start pt-1.5 text-sm transition ${
                         !inLuna ? 'text-slate-300' : 'text-slate-700'
                       } ${esteSelectata ? 'bg-accent text-white' : esteAzi ? 'bg-accent/10 text-accent font-semibold' : 'hover:bg-slate-50'}`}
                     >
                       {zi.getDate()}
-                      {tagurileZilei.length > 0 && (
+                      {tipurileZilei.length > 0 && (
                         <div className="mt-1 flex flex-col items-center gap-0.5 w-full px-1">
-                          {tagurileZilei.slice(0, 2).map((tag) =>
-                            tag === '__fără_tag__' ? (
-                              <span key={tag} className={`h-1.5 w-1.5 rounded-full ${esteSelectata ? 'bg-white' : 'bg-slate-400'}`} />
-                            ) : (
+                          {tipurileZilei.slice(0, 2).map((cod) => {
+                            if (cod === '__fara_tip__') {
+                              return <span key={cod} className={`h-1.5 w-1.5 rounded-full ${esteSelectata ? 'bg-white' : 'bg-slate-400'}`} />
+                            }
+                            const t = tipDupaCod[cod]
+                            const c = t?.culoare || CULOARE_NECUNOSCUT
+                            return (
                               <span
-                                key={tag}
+                                key={cod}
                                 className="w-full truncate rounded text-[9px] font-semibold leading-tight px-0.5"
                                 style={{
-                                  backgroundColor: esteSelectata ? 'rgba(255,255,255,0.25)' : `${tagCulori[tag] || '#94a3b8'}22`,
-                                  color: esteSelectata ? '#fff' : tagCulori[tag] || '#64748b',
+                                  backgroundColor: esteSelectata ? 'rgba(255,255,255,0.25)' : `${c}22`,
+                                  color: esteSelectata ? '#fff' : culoareText(c),
                                 }}
                               >
-                                {initialeTag(tag)}
+                                {initiale(t?.nume || cod)}
                               </span>
                             )
-                          )}
-                          {tagurileZilei.length > 2 && (
+                          })}
+                          {tipurileZilei.length > 2 && (
                             <span className={`text-[9px] ${esteSelectata ? 'text-white/80' : 'text-slate-400'}`}>
-                              +{tagurileZilei.length - 2}
+                              +{tipurileZilei.length - 2}
                             </span>
                           )}
                         </div>
@@ -374,59 +321,64 @@ export default function CalendarView({ angajat, canManageCalendar, session, onBa
               ) : (
                 <div className="space-y-2">
                   {evenimenteAfisate.map((e) => {
-                    const status = STATUS_LABELS[e.status] || { label: e.status || '—', c: '#87909e', text: '#5b6573' }
-                    const impl = e.implicare ? IMPLICARE_CULORI[e.implicare] || { c: '#87909e', text: '#5b6573' } : null
+                    const status = statusDupaCod[e.status]
+                    const anulat = status?.comportament === 'anulat'
+                    const implC = e.implicare ? IMPLICARE_CULORI[e.implicare] || CULOARE_NECUNOSCUT : null
                     const ora = formatOra(e)
+                    const pmNume = e.pm.map((id) => numeAngajat[id]).filter(Boolean)
                     return (
-                      <div key={e.id} className="rounded-xl border border-slate-100 p-3">
+                      <div key={e.id} className={`rounded-xl border border-slate-100 p-3 ${anulat ? 'opacity-60' : ''}`}>
                         <div className="flex items-start justify-between gap-2">
                           <div className="min-w-0">
-                            <p className="text-sm font-medium text-slate-800 truncate">{e.nume}</p>
+                            <p className={`text-sm font-medium text-slate-800 truncate ${anulat ? 'line-through' : ''}`}>{e.nume}</p>
                             <p className="text-xs text-slate-500 mt-0.5">
                               {formatData(e.data)}
                               {e.data_sfarsit && e.data_sfarsit !== e.data ? ` – ${formatData(e.data_sfarsit)}` : ''}
                               {ora ? ` · ${ora}` : ''}
                               {e.locatie ? ` · ${e.locatie}` : ''}
+                              {e.localitate ? ` · ${e.localitate}` : ''}
                             </p>
+                            {(pmNume.length > 0 || e.organizator) && (
+                              <p className="text-xs text-slate-400 mt-0.5">
+                                {pmNume.length > 0 && `PM: ${pmNume.join(', ')}`}
+                                {pmNume.length > 0 && e.organizator ? ' · ' : ''}
+                                {e.organizator && `Organizator: ${e.organizator}`}
+                              </p>
+                            )}
                           </div>
                           <div className="flex shrink-0 flex-col items-end gap-1">
-                            <Chip c={status.c} text={status.text}>{status.label}</Chip>
-                            {impl && <Chip c={impl.c} text={impl.text}>{e.implicare}</Chip>}
+                            {status && <Chip c={status.culoare}>{status.nume}</Chip>}
+                            {implC && <Chip c={implC}>{e.implicare}</Chip>}
                           </div>
                         </div>
 
-                        {e.tags?.length > 0 && (
+                        {e.tipuri.length > 0 && (
                           <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                            {e.tags?.map((tag) => (
-                              <span
-                                key={tag}
-                                className="rounded-full px-2 py-0.5 text-[10px] font-medium"
-                                style={{ backgroundColor: `${tagCulori[tag] || '#94a3b8'}22`, color: tagCulori[tag] || '#64748b' }}
-                              >
-                                {tag}
-                              </span>
-                            ))}
+                            {e.tipuri.map((cod) => {
+                              const t = tipDupaCod[cod]
+                              const c = t?.culoare || CULOARE_NECUNOSCUT
+                              return (
+                                <span key={cod} className="rounded-full px-2 py-0.5 text-[10px] font-medium" style={{ backgroundColor: `${c}22`, color: culoareText(c) }}>
+                                  {t?.nume || cod}
+                                </span>
+                              )
+                            })}
                           </div>
                         )}
 
                         {canManageCalendar && (
                           <div className="mt-2 flex items-center gap-4 text-xs text-slate-500">
                             <label className="flex items-center gap-1.5">
-                              <input
-                                type="checkbox"
-                                checked={e.necesita_rsvp}
-                                onChange={(ev) => toggleFlag(e.id, 'necesita_rsvp', ev.target.checked)}
-                              />
+                              <input type="checkbox" checked={e.necesita_rsvp} disabled={anulat} onChange={(ev) => toggleFlag(e.id, 'necesita_rsvp', ev.target.checked)} />
                               RSVP
                             </label>
                             <label className="flex items-center gap-1.5">
-                              <input
-                                type="checkbox"
-                                checked={e.necesita_costume}
-                                onChange={(ev) => toggleFlag(e.id, 'necesita_costume', ev.target.checked)}
-                              />
+                              <input type="checkbox" checked={e.necesita_costume} disabled={anulat} onChange={(ev) => toggleFlag(e.id, 'necesita_costume', ev.target.checked)} />
                               Costume
                             </label>
+                            <button onClick={() => setFormDeschis(e)} className="ml-auto flex items-center gap-1 rounded-full px-2 py-1 text-accent hover:bg-accent/10">
+                              <Pencil size={12} /> Editează
+                            </button>
                           </div>
                         )}
                       </div>
@@ -439,54 +391,22 @@ export default function CalendarView({ angajat, canManageCalendar, session, onBa
         )}
       </main>
 
-      {showTagManager && (
-        <TagColorManager
-          taguri={toateTagurile}
-          culori={tagCulori}
-          onClose={() => setShowTagManager(false)}
-          onChanged={load}
+      {formDeschis && (
+        <EvenimentForm
+          eveniment={formDeschis === 'nou' ? null : formDeschis}
+          tipuri={tipuri}
+          statusuri={statusuri}
+          angajati={angajati}
+          onClose={() => setFormDeschis(null)}
+          onSaved={dupaSalvare}
         />
       )}
 
+      {showListe && (
+        <ListeEvenimente tipuri={tipuri} statusuri={statusuri} evenimente={evenimente} onClose={() => setShowListe(false)} onChanged={load} />
+      )}
+
       <SiteFooter />
-    </div>
-  )
-}
-
-function TagColorManager({ taguri, culori, onClose, onChanged }) {
-  async function schimbaCuloare(tag, culoare) {
-    await supabase.from('evenimente_tag_culori').upsert({ tag, culoare })
-    onChanged()
-  }
-
-  return (
-    <div className="fixed inset-0 z-30 flex items-start justify-center overflow-y-auto bg-black/40 p-4 pt-10">
-      <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-slate-800">Culori taguri</h3>
-          <button onClick={onClose} className="rounded-full p-1.5 text-slate-500 hover:bg-slate-100">
-            <XIcon size={16} />
-          </button>
-        </div>
-        <div className="space-y-3">
-          {taguri.map((tag) => (
-            <div key={tag} className="flex items-center justify-between gap-3">
-              <span className="text-sm text-slate-700">{tag}</span>
-              <div className="flex items-center gap-1.5">
-                {CULORI_PRESTABILITE.map((c) => (
-                  <button
-                    key={c}
-                    onClick={() => schimbaCuloare(tag, c)}
-                    className="h-5 w-5 rounded-full ring-offset-1"
-                    style={{ backgroundColor: c, boxShadow: culori[tag] === c ? `0 0 0 2px white, 0 0 0 3.5px ${c}` : 'none' }}
-                  />
-                ))}
-              </div>
-            </div>
-          ))}
-          {taguri.length === 0 && <p className="text-sm text-slate-400">Niciun tag sincronizat încă.</p>}
-        </div>
-      </div>
     </div>
   )
 }

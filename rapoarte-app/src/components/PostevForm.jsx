@@ -4,7 +4,7 @@ import { supabase } from '../supabaseClient'
 import { formatData } from '../lib/luni'
 import { inputCls, labelCls, btnPrimary, btnGhost, cardCls } from '../lib/ui'
 import {
-  IMPLICARI, normalizeaza, tipuriDinTaguri, campuriVizibile, valideaza, curataLocalitati, totalEvenimente,
+  IMPLICARI, normalizeaza, tipuriDinEveniment, campuriVizibile, valideaza, curataLocalitati, totalEvenimente,
 } from '../lib/postev'
 
 const contactGol = () => ({ institutie: '', persoana: '', telefon: '', email: '' })
@@ -27,15 +27,11 @@ function formularInitial({ eveniment, raport, cfg, angajatCurent }) {
       contacte: raport.contacte?.length ? raport.contacte : [contactGol()],
     }
   }
-  // responsabil: persoana din calendar dacă se potrivește cu un angajat, altfel autorul
-  const rNorm = normalizeaza(eveniment?.responsabil)
-  const potrivit = rNorm
-    ? cfg.angajati.find((a) => normalizeaza(a.nume_complet) === rNorm) ||
-      cfg.angajati.find((a) => rNorm.includes(normalizeaza(a.nume_complet)) || normalizeaza(a.nume_complet).includes(rNorm))
-    : null
+  // responsabil: primul PM al evenimentului din calendar, altfel autorul
+  const pmCalendar = cfg.angajati.find((a) => (eveniment?.pm || []).includes(a.id))
   return {
-    tipuri: eveniment ? tipuriDinTaguri(eveniment.tags, cfg.tipuri) : [],
-    responsabil_angajat_id: potrivit?.id || angajatCurent?.id || '',
+    tipuri: eveniment ? tipuriDinEveniment(eveniment, cfg.tipuri) : [],
+    responsabil_angajat_id: pmCalendar?.id || angajatCurent?.id || '',
     data_inceput: eveniment?.data || '',
     data_sfarsit: eveniment?.data_sfarsit || eveniment?.data || '',
     localitati: [{ localitate: '', nr: '1' }],

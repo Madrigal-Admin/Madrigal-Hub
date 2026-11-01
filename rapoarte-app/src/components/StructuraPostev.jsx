@@ -25,7 +25,6 @@ export default function StructuraPostev() {
   const [campuri, setCampuri] = useState([])
   const [matrice, setMatrice] = useState([])
   const [loading, setLoading] = useState(true)
-  const [tipNou, setTipNou] = useState({ nume: '', eticheta: '' })
   const [campEditat, setCampEditat] = useState(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -36,7 +35,7 @@ export default function StructuraPostev() {
 
   async function load() {
     const [t, c, m] = await Promise.all([
-      supabase.from('rap_tipuri').select('*').order('ordine'),
+      supabase.from('tipuri_eveniment').select('*').order('ordine'),
       supabase.from('rap_postev_campuri').select('*').order('ordine'),
       supabase.from('rap_postev_campuri_tipuri').select('*'),
     ])
@@ -44,28 +43,6 @@ export default function StructuraPostev() {
     setCampuri(c.data || [])
     setMatrice(m.data || [])
     setLoading(false)
-  }
-
-  async function salveazaTip(t, patch) {
-    setError('')
-    const { error: err } = await supabase.from('rap_tipuri').update(patch).eq('cod', t.cod)
-    if (err) setError('Nu am putut salva tipul.')
-    load()
-  }
-
-  async function adaugaTip(e) {
-    e.preventDefault()
-    setError('')
-    if (!tipNou.nume.trim()) return setError('Scrie numele tipului.')
-    const cod = slug(tipNou.nume)
-    if (!cod || tipuri.some((t) => t.cod === cod)) return setError('Există deja un tip cu acest nume.')
-    const { error: err } = await supabase.from('rap_tipuri').insert({
-      cod, nume: tipNou.nume.trim(), eticheta_clickup: tipNou.eticheta.trim().toLowerCase() || null,
-      prioritate: 4, ordine: tipuri.length + 1,
-    })
-    if (err) return setError('Nu am putut adăuga tipul.')
-    setTipNou({ nume: '', eticheta: '' })
-    load()
   }
 
   async function seteazaMod(campCod, tipCod, mod) {
@@ -148,30 +125,15 @@ export default function StructuraPostev() {
       <div className={cardCls}>
         <p className="text-sm font-medium text-slate-700">Tipuri de eveniment</p>
         <p className="mt-1 text-xs text-slate-500">
-          „Eticheta din ClickUp" (litere mici, exact ca în ClickUp) aduce automat tipul în raport, când evenimentul are acea etichetă.
+          Tipurile (nume, culoare, activ / dezactivat) se gestionează din Calendar, la „Tipuri și statusuri". Aici stabilești doar ce câmpuri apar pentru fiecare tip.
         </p>
-        <div className="mt-3 space-y-2">
+        <div className="mt-3 flex flex-wrap gap-2">
           {tipuri.map((t) => (
-            <div key={t.cod} className="grid items-center gap-2 sm:grid-cols-[1fr_1fr_auto]">
-              <span className={`text-sm font-medium ${t.activ ? 'text-slate-800' : 'text-slate-400'}`}>{t.nume}</span>
-              <input
-                className={inputCls} placeholder="etichetă ClickUp" defaultValue={t.eticheta_clickup || ''}
-                onBlur={(e) => {
-                  const v = e.target.value.trim().toLowerCase()
-                  if (v !== (t.eticheta_clickup || '')) salveazaTip(t, { eticheta_clickup: v || null })
-                }}
-              />
-              <label className="flex items-center gap-2 text-xs text-slate-600">
-                <input type="checkbox" checked={t.activ} onChange={(e) => salveazaTip(t, { activ: e.target.checked })} /> Activ
-              </label>
-            </div>
+            <span key={t.cod} className={`rounded-full px-3 py-1 text-xs font-medium ${t.activ ? 'bg-slate-100 text-slate-700' : 'bg-slate-50 text-slate-400'}`}>
+              {t.nume}{t.activ ? '' : ' (dezactivat)'}
+            </span>
           ))}
         </div>
-        <form onSubmit={adaugaTip} className="mt-3 grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
-          <input className={inputCls} placeholder="Tip nou (nume)" value={tipNou.nume} onChange={(e) => setTipNou({ ...tipNou, nume: e.target.value })} />
-          <input className={inputCls} placeholder="etichetă ClickUp (opțional)" value={tipNou.eticheta} onChange={(e) => setTipNou({ ...tipNou, eticheta: e.target.value })} />
-          <button type="submit" className={btnGhost}><Plus size={14} /> Adaugă tip</button>
-        </form>
       </div>
 
       <div className={cardCls}>

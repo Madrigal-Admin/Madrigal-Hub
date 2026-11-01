@@ -39,7 +39,7 @@ const TOOLS = [
   },
 ]
 
-export default function Dashboard({ angajat, accesTooluri, isHubAdmin, onOpenAdmin, onOpenCalendar, onSignOut }) {
+export default function Dashboard({ angajat, accesTooluri, isHubAdmin, onOpenAdmin, onOpenCalendar, canSeeStatistici, onOpenStatistici, onSignOut }) {
   const accesSet = new Set(accesTooluri.map((a) => a.tool))
 
   return (
@@ -75,6 +75,18 @@ export default function Dashboard({ angajat, accesTooluri, isHubAdmin, onOpenAdm
               Toate concertele și evenimentele corului, la un loc.
             </p>
           </button>
+
+          {canSeeStatistici && (
+            <button
+              onClick={onOpenStatistici}
+              className="text-left bg-white rounded-xl shadow-sm p-5 hover:shadow-md transition"
+            >
+              <p className="font-medium text-slate-800">Statistici evenimente</p>
+              <p className="text-sm text-slate-500 mt-1">
+                Evenimente pe tip, responsabil, implicare și lună.
+              </p>
+            </button>
+          )}
 
           {isHubAdmin && (
             <button

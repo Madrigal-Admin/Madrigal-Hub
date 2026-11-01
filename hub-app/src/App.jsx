@@ -4,6 +4,7 @@ import Auth from './components/Auth'
 import Dashboard from './components/Dashboard'
 import AdminLayout from './components/AdminLayout'
 import CalendarView from './components/CalendarView'
+import StatisticiEvenimente from './components/StatisticiEvenimente'
 
 export default function App() {
   const [session, setSession] = useState(undefined) // undefined = încă neverificat
@@ -124,6 +125,7 @@ export default function App() {
 
   const isHubAdmin = accesTooluri.some((a) => a.tool === 'hub' && a.rol === 'admin')
   const canManageCalendar = isHubAdmin || accesTooluri.some((a) => a.tool === 'calendar' && a.rol === 'admin')
+  const canSeeStatistici = canManageCalendar || accesTooluri.some((a) => a.tool === 'calendar' && a.rol === 'statistici')
 
   if (view === 'admin' && isHubAdmin) {
     return (
@@ -140,7 +142,16 @@ export default function App() {
       <CalendarView
         angajat={angajat}
         canManageCalendar={canManageCalendar}
-        session={session}
+        onBack={() => navigateTo('dashboard')}
+        onSignOut={handleSignOut}
+      />
+    )
+  }
+
+  if (view === 'statistici' && canSeeStatistici) {
+    return (
+      <StatisticiEvenimente
+        angajat={angajat}
         onBack={() => navigateTo('dashboard')}
         onSignOut={handleSignOut}
       />
@@ -154,6 +165,8 @@ export default function App() {
       isHubAdmin={isHubAdmin}
       onOpenAdmin={() => navigateTo('admin')}
       onOpenCalendar={() => navigateTo('calendar')}
+      canSeeStatistici={canSeeStatistici}
+      onOpenStatistici={() => navigateTo('statistici')}
       onSignOut={handleSignOut}
     />
   )
