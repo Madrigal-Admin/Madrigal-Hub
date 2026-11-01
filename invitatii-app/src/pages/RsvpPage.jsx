@@ -38,6 +38,17 @@ export default function RsvpPage({ token }) {
   if (loading) return <PublicLayout><p className="text-center text-sm text-slate-400">Se încarcă...</p></PublicLayout>
   if (error) return <PublicLayout><p className="text-center text-sm text-rose-600">{error}</p></PublicLayout>
 
+  if (info.anulat) {
+    return (
+      <PublicLayout>
+        <div className="bg-white rounded-2xl shadow-sm p-6 text-center">
+          <h2 className="font-display text-xl font-semibold text-slate-800">{info.nume_eveniment}</h2>
+          <p className="mt-4 text-sm text-slate-600">Acest eveniment a fost anulat. Nu mai este nevoie de un răspuns.</p>
+        </div>
+      </PublicLayout>
+    )
+  }
+
   return (
     <PublicLayout>
       <div className="bg-white rounded-2xl shadow-sm p-6 text-center">
