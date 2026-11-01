@@ -104,10 +104,24 @@ function Continut({ date, angajat, rol, reload }) {
     ctx.admin ? { key: 'checklist', label: 'Checklist' } : null,
   ].filter(Boolean)
 
-  const [view, setView] = useState(() => (ctx.sunPm && !ctx.admin ? 'evenimente' : 'mele'))
-  const [deschis, setDeschis] = useState(null) // id task deschis
-  const [formular, setFormular] = useState(null) // { task?, eveniment? }
-  const [checklist, setChecklist] = useState(null) // { mod, eveniment }
+  // Linkurile din homepage-ul Hub: ?tab=… ?task=… ?nou=1 ?start=<id eveniment>
+  const params = useMemo(() => new URLSearchParams(window.location.search), [])
+  const tabCerut = params.get('tab')
+  const startCerut = params.get('start')
+  const [view, setView] = useState(() =>
+    taburi.some((t) => t.key === tabCerut) ? tabCerut : ctx.sunPm && !ctx.admin ? 'evenimente' : 'mele'
+  )
+  const [deschis, setDeschis] = useState(params.get('task')) // id task deschis
+  const [formular, setFormular] = useState(() => (params.get('nou') === '1' && (ctx.poateEveniment || ctx.poateOperational) ? {} : null)) // { task?, eveniment? }
+  const [checklist, setChecklist] = useState(() => {
+    const e = startCerut && ctx.evMap[startCerut]
+    return e && ctx.comportament(e.id) === 'deschis' && (ctx.admin || ctx.pmLaEveniment(e.id)) ? { mod: 'start', eveniment: e } : null
+  }) // { mod, eveniment }
+
+  // După ce linkul a fost folosit, curăț adresa, ca la o reîncărcare să nu se redeschidă același lucru.
+  useEffect(() => {
+    if (window.location.search) window.history.replaceState(null, '', window.location.pathname)
+  }, [])
 
   const poateCrea = ctx.poateEveniment || ctx.poateOperational
   const dupaSalvare = async () => { setFormular(null); await reload() }

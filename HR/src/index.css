@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 html {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 
 body {
@@ -12,14 +12,14 @@ body {
 }
 
 .font-display {
-  font-family: 'Fraunces', Georgia, serif;
+  font-family: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
 
 ::selection {
-  background-color: #bcd2fe;
+  background-color: #c9d8ee;
 }
 
 .focus-ring:focus-visible {
-  outline: 2px solid #3566f0;
+  outline: 2px solid #22406b;
   outline-offset: 2px;
 }

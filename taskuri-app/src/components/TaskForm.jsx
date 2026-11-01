@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { PRIORITATI, inputCls, labelCls, mesajEroare } from '../lib/ui'
 import AngajatiPicker from './AngajatiPicker'
+import EvenimentPicker from './EvenimentPicker'
 import { Modal } from './Mici'
 
 // Creare / editare task. La editare, tipul și evenimentul nu se mai pot schimba.
@@ -105,15 +106,17 @@ export default function TaskForm({ ctx, task, evenimentImplicit, onClose, onSave
         {!editare && tipuriPosibile.length > 1 && !evenimentImplicit && (
           <div>
             <label className={labelCls}>Tip task</label>
-            <div className="flex gap-2">
-              {[['eveniment', 'Task de eveniment'], ['operational', 'Task operațional']].filter(([k]) => tipuriPosibile.includes(k)).map(([k, l]) => (
+            <div className="flex flex-wrap gap-2.5">
+              {[['eveniment', 'Task de eveniment', 'Legat de un eveniment din calendar'], ['operational', 'Task operațional', 'Activitate curentă de birou, fără eveniment']].filter(([k]) => tipuriPosibile.includes(k)).map(([k, l, d]) => (
                 <button
                   key={k}
                   type="button"
+                  aria-pressed={f.tip === k}
                   onClick={() => set('tip', k)}
-                  className={`flex-1 rounded-lg border px-3 py-2 text-sm font-medium ${f.tip === k ? 'border-accent bg-indigo-50 text-accent' : 'border-slate-200 text-slate-600'}`}
+                  className={`flex min-h-[64px] flex-1 basis-52 flex-col gap-0.5 rounded-xl border px-3.5 py-2.5 text-left ${f.tip === k ? 'border-2 border-accent bg-[#EEF3FB]' : 'border-slate-300 bg-white'}`}
                 >
-                  {l}
+                  <span className="text-[15px] font-bold text-slate-900">{l}</span>
+                  <span className="text-[13px] font-medium text-slate-500">{d}</span>
                 </button>
               ))}
             </div>
@@ -128,12 +131,7 @@ export default function TaskForm({ ctx, task, evenimentImplicit, onClose, onSave
         {f.tip === 'eveniment' ? (
           <div>
             <label className={labelCls}>Eveniment *</label>
-            <select className={inputCls} value={f.eveniment_id} disabled={editare || !!evenimentImplicit} onChange={(e) => set('eveniment_id', e.target.value)}>
-              <option value="">— alege evenimentul —</option>
-              {evenimenteAlegere.map((e) => (
-                <option key={e.id} value={e.id}>{e.nume}</option>
-              ))}
-            </select>
+            <EvenimentPicker evenimente={evenimenteAlegere} ctx={ctx} valoare={f.eveniment_id} dezactivat={editare || !!evenimentImplicit} onChange={(v) => set('eveniment_id', v)} />
           </div>
         ) : (
           <div>

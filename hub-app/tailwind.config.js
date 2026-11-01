@@ -6,9 +6,13 @@ export default {
       colors: {
         // Aceiași tokeni ca la HR — vezi și /assets/tema-shared.css
         accent: {
-          DEFAULT: '#4F46E5',
-          hover: '#4338CA',
+          DEFAULT: '#22406B',
+          hover: '#142846',
         },
+        cream: '#F6EEDB',
+      },
+      fontFamily: {
+        sans: ['Manrope', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
       },
     },
   },

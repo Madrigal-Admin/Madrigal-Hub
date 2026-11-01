@@ -120,7 +120,7 @@ export async function handler(event) {
         <p style="color: #64748b; margin-top: 0;">${formatData(eveniment.data)}${eveniment.locatie ? ` · ${eveniment.locatie}` : ''}</p>
         <p style="white-space: pre-line;">${mesaj}</p>
         <p style="margin-top: 24px;">
-          <a href="${rsvpLink}" style="background:#4F46E5;color:#fff;padding:12px 20px;border-radius:999px;text-decoration:none;font-weight:600;">
+          <a href="${rsvpLink}" style="background:#22406B;color:#fff;padding:12px 20px;border-radius:999px;text-decoration:none;font-weight:600;">
             Răspunde la invitație
           </a>
         </p>

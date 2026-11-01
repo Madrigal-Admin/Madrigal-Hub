@@ -5,9 +5,12 @@ export default {
     extend: {
       colors: {
         accent: {
-          DEFAULT: '#4F46E5',
-          hover: '#4338CA',
+          DEFAULT: '#22406B',
+          hover: '#142846',
         },
+      },
+      fontFamily: {
+        sans: ['Manrope', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
       },
     },
   },

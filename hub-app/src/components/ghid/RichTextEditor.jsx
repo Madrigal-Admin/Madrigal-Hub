@@ -36,7 +36,7 @@ import { supabase } from '../../supabaseClient'
 //
 // Imaginile inserate din editor se încarcă în bucket-ul public
 // "ghid-foto" și se introduc ca URL public direct în HTML.
-const CULORI_TEXT = ['#1e293b', '#dc2626', '#ea580c', '#ca8a04', '#16a34a', '#4f46e5', '#9333ea']
+const CULORI_TEXT = ['#1e293b', '#dc2626', '#ea580c', '#ca8a04', '#16a34a', '#22406b', '#9333ea']
 
 export default function RichTextEditor({ value, onChange, placeholder }) {
   const editorRef = useRef(null)
