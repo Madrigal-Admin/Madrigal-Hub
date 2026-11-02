@@ -10,31 +10,23 @@ export default function EvenimentPicker({ onAlege, onManual, onCancel }) {
   const [loading, setLoading] = useState(true)
   const [lista, setLista] = useState([])
   const [cauta, setCauta] = useState('')
-  const [numeTip, setNumeTip] = useState({})
 
   useEffect(() => {
     async function load() {
-      const [{ data: ev }, { data: raportate }, { data: tp }] = await Promise.all([
-        supabase
-          .from('evenimente')
-          .select('*, eveniment_tipuri(tip_cod), eveniment_pm(angajat_id)')
-          .not('data', 'is', null)
-          .neq('status', 'anulat')
-          .order('data', { ascending: false })
-          .limit(400),
+      const [{ data: ev }, { data: raportate }, { data: tipuri }] = await Promise.all([
+        supabase.from('evenimente').select('*, eveniment_tipuri(tip_cod), eveniment_pm(angajat_id)').not('data', 'is', null).order('data', { ascending: false }).limit(400),
         supabase.rpc('rap_evenimente_raportate'),
         supabase.from('tipuri_eveniment').select('cod, nume'),
       ])
       const deja = new Set(raportate || [])
-      setNumeTip(Object.fromEntries((tp || []).map((t) => [t.cod, t.nume])))
+      const nume = Object.fromEntries((tipuri || []).map((t) => [t.cod, t.nume]))
       setLista(
         (ev || [])
-          .map((e) => ({
-            ...e,
-            tipuri: (e.eveniment_tipuri || []).map((t) => t.tip_cod),
-            pm: (e.eveniment_pm || []).map((p) => p.angajat_id),
-          }))
-          .filter((e) => (e.data_sfarsit || e.data) < azi() && !deja.has(e.id))
+          .filter((e) => e.status !== 'anulat' && (e.data_sfarsit || e.data) < azi() && !deja.has(e.id))
+          .map((e) => {
+            const coduri = (e.eveniment_tipuri || []).map((x) => x.tip_cod)
+            return { ...e, tipuri_coduri: coduri, tipuri_nume: coduri.map((c) => nume[c] || c), pm_ids: (e.eveniment_pm || []).map((x) => x.angajat_id) }
+          })
       )
       setLoading(false)
     }
@@ -68,7 +60,7 @@ export default function EvenimentPicker({ onAlege, onManual, onCancel }) {
               {formatData(e.data)}
               {e.data_sfarsit && e.data_sfarsit !== e.data ? ` – ${formatData(e.data_sfarsit)}` : ''}
               {e.locatie ? ` · ${e.locatie}` : ''}
-              {e.tipuri.length ? ` · ${e.tipuri.map((c) => numeTip[c] || c).join(', ')}` : ''}
+              {e.tipuri_nume.length ? ` · ${e.tipuri_nume.join(', ')}` : ''}
             </p>
           </button>
         ))}

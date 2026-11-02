@@ -4,7 +4,7 @@ import { supabase } from '../supabaseClient'
 import { formatData } from '../lib/luni'
 import { inputCls, labelCls, btnPrimary, btnGhost, cardCls } from '../lib/ui'
 import {
-  IMPLICARI, normalizeaza, tipuriDinEveniment, campuriVizibile, valideaza, curataLocalitati, totalEvenimente,
+  IMPLICARI, normalizeaza, campuriVizibile, valideaza, curataLocalitati, totalEvenimente,
 } from '../lib/postev'
 
 const contactGol = () => ({ institutie: '', persoana: '', telefon: '', email: '' })
@@ -28,10 +28,10 @@ function formularInitial({ eveniment, raport, cfg, angajatCurent }) {
     }
   }
   // responsabil: primul PM al evenimentului din calendar, altfel autorul
-  const pmCalendar = cfg.angajati.find((a) => (eveniment?.pm || []).includes(a.id))
+  const potrivit = (eveniment?.pm_ids || []).map((id) => cfg.angajati.find((a) => a.id === id)).find(Boolean) || null
   return {
-    tipuri: eveniment ? tipuriDinEveniment(eveniment, cfg.tipuri) : [],
-    responsabil_angajat_id: pmCalendar?.id || angajatCurent?.id || '',
+    tipuri: (eveniment?.tipuri_coduri || []).filter((c) => cfg.tipuri.some((t) => t.cod === c && t.activ)),
+    responsabil_angajat_id: potrivit?.id || angajatCurent?.id || '',
     data_inceput: eveniment?.data || '',
     data_sfarsit: eveniment?.data_sfarsit || eveniment?.data || '',
     localitati: [{ localitate: '', nr: '1' }],

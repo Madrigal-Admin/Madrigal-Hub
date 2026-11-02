@@ -35,7 +35,7 @@ export default function StructuraPostev() {
 
   async function load() {
     const [t, c, m] = await Promise.all([
-      supabase.from('tipuri_eveniment').select('*').order('ordine'),
+      supabase.from('rap_tipuri').select('*').order('ordine'),
       supabase.from('rap_postev_campuri').select('*').order('ordine'),
       supabase.from('rap_postev_campuri_tipuri').select('*'),
     ])
@@ -43,6 +43,13 @@ export default function StructuraPostev() {
     setCampuri(c.data || [])
     setMatrice(m.data || [])
     setLoading(false)
+  }
+
+  async function salveazaTip(t, patch) {
+    setError('')
+    const { error: err } = await supabase.from('rap_tipuri').update(patch).eq('cod', t.cod)
+    if (err) setError('Nu am putut salva tipul.')
+    load()
   }
 
   async function seteazaMod(campCod, tipCod, mod) {
@@ -125,13 +132,16 @@ export default function StructuraPostev() {
       <div className={cardCls}>
         <p className="text-sm font-medium text-slate-700">Tipuri de eveniment</p>
         <p className="mt-1 text-xs text-slate-500">
-          Tipurile (nume, culoare, activ / dezactivat) se gestionează din Calendar, la „Tipuri și statusuri". Aici stabilești doar ce câmpuri apar pentru fiecare tip.
+          Tipurile se administrează în Hub, la Calendar → Tipuri și statusuri. Un tip nou apare aici automat; poți să-l dezactivezi pentru rapoarte.
         </p>
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-3 space-y-2">
           {tipuri.map((t) => (
-            <span key={t.cod} className={`rounded-full px-3 py-1 text-xs font-medium ${t.activ ? 'bg-slate-100 text-slate-700' : 'bg-slate-50 text-slate-400'}`}>
-              {t.nume}{t.activ ? '' : ' (dezactivat)'}
-            </span>
+            <div key={t.cod} className="grid items-center gap-2 sm:grid-cols-[1fr_auto]">
+              <span className={`text-sm font-medium ${t.activ ? 'text-slate-800' : 'text-slate-400'}`}>{t.nume}</span>
+              <label className="flex items-center gap-2 text-xs text-slate-600">
+                <input type="checkbox" checked={t.activ} onChange={(e) => salveazaTip(t, { activ: e.target.checked })} /> Activ
+              </label>
+            </div>
           ))}
         </div>
       </div>
