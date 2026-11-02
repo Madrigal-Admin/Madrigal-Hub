@@ -4,7 +4,6 @@ import Auth from './components/Auth'
 import Dashboard from './components/Dashboard'
 import AdminLayout from './components/AdminLayout'
 import CalendarView from './components/CalendarView'
-import StatisticiEvenimente from './components/StatisticiEvenimente'
 import Shell from './components/Shell'
 import { construiesteTooluri } from './components/home/NavigareTooluri'
 import { TaskuriProvider } from './components/taskuri/TaskuriContext'
@@ -137,7 +136,6 @@ export default function App() {
   const permise = {
     dashboard: true,
     calendar: true,
-    statistici: canSeeStatistici,
     admin: isHubAdmin,
     evenimente: !!rolTaskuri,
     departament: !!rolTaskuri,
@@ -147,10 +145,8 @@ export default function App() {
 
   const tooluri = construiesteTooluri({
     accesSet,
-    canSeeStatistici,
     isHubAdmin,
     onOpenCalendar: () => navigateTo('calendar'),
-    onOpenStatistici: () => navigateTo('statistici'),
     onOpenAdmin: () => navigateTo('admin'),
   })
 
@@ -158,8 +154,7 @@ export default function App() {
     <TaskuriProvider angajat={angajat} accesTooluri={accesTooluri}>
       <Shell angajat={angajat} tooluri={tooluri} view={viewEfectiv} onNavigate={navigateTo} onSignOut={handleSignOut}>
         {viewEfectiv === 'dashboard' && <Dashboard angajat={angajat} onNavigate={navigateTo} onOpenCalendar={() => navigateTo('calendar')} />}
-        {viewEfectiv === 'calendar' && <CalendarView canManageCalendar={canManageCalendar} />}
-        {viewEfectiv === 'statistici' && <StatisticiEvenimente />}
+        {viewEfectiv === 'calendar' && <CalendarView canManageCalendar={canManageCalendar} canSeeStatistici={canSeeStatistici} />}
         {viewEfectiv === 'admin' && <AdminLayout />}
         {viewEfectiv === 'evenimente' && <PaginaEvenimente />}
         {viewEfectiv === 'departament' && <PaginaDepartament />}

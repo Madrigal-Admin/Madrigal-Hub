@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { ArrowDown, ArrowUp } from 'lucide-react'
 import { LUNI, PALETA, culoareText, incarcaTot } from '../lib/evenimente'
 
 const selectCls = 'rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700'
@@ -160,9 +161,27 @@ export default function StatisticiEvenimente() {
   }))
   const maxLuna = Math.max(1, ...peLuna.map((l) => l.valoare))
 
+  // Lista de jos: aceleași evenimente ca în grafice (respectă filtrele de sus).
+  const [sortare, setSortare] = useState({ cheie: 'data', dir: 1 })
+  const numeTip = useMemo(() => Object.fromEntries(tipuri.map((t) => [t.cod, t.nume])), [tipuri])
+  const numePm = (e) => e.pm.map((id) => angajati.find((a) => a.id === id)?.nume_complet).filter(Boolean).join(', ')
+  const randuri = useMemo(() => {
+    const val = {
+      nume: (e) => (e.nume || '').toLowerCase(),
+      data: (e) => e.data || '',
+      pm: (e) => numePm(e).toLowerCase(),
+      tip: (e) => e.tipuri.map((c) => numeTip[c] || c).join(', ').toLowerCase(),
+      localitate: (e) => (e.localitate || '').toLowerCase(),
+    }[sortare.cheie]
+    return [...selectie].sort((a, b) => (val(a) < val(b) ? -sortare.dir : val(a) > val(b) ? sortare.dir : 0))
+  }, [selectie, sortare, numeTip, angajati]) // eslint-disable-line react-hooks/exhaustive-deps
+  const comutaSortare = (cheie) => setSortare((s) => (s.cheie === cheie ? { cheie, dir: -s.dir } : { cheie, dir: 1 }))
+  const dataScurta = (d) => (d ? d.slice(8, 10) + '.' + d.slice(5, 7) + '.' + d.slice(0, 4) : '—')
+  const coloane = [['nume', 'Eveniment'], ['data', 'Data'], ['pm', 'Responsabil'], ['tip', 'Tip eveniment'], ['localitate', 'Localitate']]
+
   return (
-    <div className="flex flex-1 flex-col">
-      <main className="flex-1 max-w-6xl mx-auto px-6 py-8 w-full">
+    <div>
+      <main className="w-full px-4 py-5 sm:px-6">
         {eroare && <p className="mb-4 text-sm text-rose-600">{eroare}</p>}
 
         <div className="mb-5 flex flex-wrap items-center gap-3 rounded-xl bg-white p-4 shadow-sm">
@@ -228,6 +247,42 @@ export default function StatisticiEvenimente() {
                     <span className="text-[11px] text-slate-400">{l.nume}</span>
                   </div>
                 ))}
+              </div>
+            </div>
+
+            <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
+              <p className="px-5 pt-4 text-sm font-semibold text-slate-800">Lista evenimentelor <span className="font-normal text-slate-400">({randuri.length})</span></p>
+              <div className="mt-3 overflow-x-auto">
+                <table className="w-full min-w-[720px] text-left text-sm">
+                  <thead>
+                    <tr className="border-y border-slate-100 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                      {coloane.map(([k, l]) => (
+                        <th key={k} scope="col" className="px-5 py-2 font-semibold" aria-sort={sortare.cheie === k ? (sortare.dir === 1 ? 'ascending' : 'descending') : 'none'}>
+                          <button type="button" onClick={() => comutaSortare(k)} className="inline-flex items-center gap-1 uppercase hover:text-slate-800">
+                            {l}
+                            {sortare.cheie === k && (sortare.dir === 1 ? <ArrowUp size={12} /> : <ArrowDown size={12} />)}
+                          </button>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {randuri.map((e) => (
+                      <tr key={e.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/60">
+                        <td className="px-5 py-2 font-medium text-slate-800">{e.nume}</td>
+                        <td className="whitespace-nowrap px-5 py-2 text-slate-600">
+                          {dataScurta(e.data)}{e.data_sfarsit && e.data_sfarsit !== e.data ? ` – ${dataScurta(e.data_sfarsit)}` : ''}
+                        </td>
+                        <td className="px-5 py-2 text-slate-600">{numePm(e) || '—'}</td>
+                        <td className="px-5 py-2 text-slate-600">{e.tipuri.map((c) => numeTip[c] || c).join(', ') || '—'}</td>
+                        <td className="px-5 py-2 text-slate-600">{e.localitate || '—'}</td>
+                      </tr>
+                    ))}
+                    {randuri.length === 0 && (
+                      <tr><td colSpan={5} className="px-5 py-6 text-center text-slate-400">Niciun eveniment pentru filtrele alese.</td></tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>

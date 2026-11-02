@@ -4,6 +4,7 @@ import Evenimente from './Evenimente'
 import TaskLista from './TaskLista'
 import GrupuriAdmin from './GrupuriAdmin'
 import ChecklistAdmin from './ChecklistAdmin'
+import DashboardEchipa from './DashboardEchipa'
 import { Plus } from 'lucide-react'
 
 const Cadru = ({ titlu, descriere, actiune, children }) => (
@@ -33,12 +34,18 @@ export function PaginaEvenimente() {
 
 export function PaginaDepartament() {
   const { ctx, acte } = useTaskuri()
+  const [grup, setGrup] = useState('') // '' = toate departamentele mele
   if (!ctx) return <Incarca />
-  const taskuri = ctx.admin ? ctx.taskuri.filter((t) => t.tip === 'operational') : ctx.taskuriDepartament
+  const grupuri = ctx.grupuri.filter((g) => g.activ && (ctx.admin || ctx.grupuriCoordonate.has(g.id)))
+  const grupAles = grupuri.some((g) => g.id === grup) ? grup : ''
+  const idsGrupuri = new Set(grupAles ? [grupAles] : grupuri.map((g) => g.id))
+  const idsMembri = new Set(ctx.membri.filter((m) => idsGrupuri.has(m.grup_id)).map((m) => m.angajat_id))
+  const baza = ctx.admin ? ctx.taskuri.filter((t) => t.tip === 'operational') : ctx.taskuriDepartament
+  const taskuri = baza.filter((t) => (t.grup_id && idsGrupuri.has(t.grup_id)) || (t.responsabil_id && idsMembri.has(t.responsabil_id)))
   return (
     <Cadru
-      titlu="Tichete departament"
-      descriere="Taskurile departamentelor pe care le coordonezi."
+      titlu="Echipa mea"
+      descriere="Încărcarea echipei și taskurile departamentelor pe care le coordonezi."
       actiune={
         ctx.poateOperational && (
           <button type="button" onClick={() => acte.taskNou()} className="inline-flex min-h-[44px] items-center gap-2 rounded-[10px] bg-accent px-[18px] text-[15px] font-bold text-white hover:bg-accent-hover">
@@ -47,6 +54,16 @@ export function PaginaDepartament() {
         )
       }
     >
+      {grupuri.length > 1 && (
+        <div className="mb-4 flex flex-wrap gap-2" role="group" aria-label="Departament">
+          {[['', 'Toate departamentele'], ...grupuri.map((g) => [g.id, g.nume])].map(([id, nume]) => (
+            <button key={id || 'toate'} type="button" aria-pressed={grupAles === id} onClick={() => setGrup(id)} className={`min-h-[44px] rounded-full border px-3.5 text-sm font-semibold ${grupAles === id ? 'border-accent bg-accent text-white' : 'border-[#CBD3E0] bg-white text-accent'}`}>
+              {nume}
+            </button>
+          ))}
+        </div>
+      )}
+      <DashboardEchipa taskuri={taskuri} membri={[...idsMembri]} ctx={ctx} />
       <TaskLista taskuri={taskuri} ctx={ctx} onOpen={(t) => acte.deschideTask(t.id)} />
     </Cadru>
   )

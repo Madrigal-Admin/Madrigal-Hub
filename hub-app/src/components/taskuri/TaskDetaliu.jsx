@@ -81,6 +81,7 @@ export default function TaskDetaliu({ taskId, ctx, onClose, onEdit }) {
       <div className="divide-y divide-slate-100">
         {rand('Tip', task.tip === 'eveniment' ? 'Task de eveniment' : 'Task operațional')}
         {task.tip === 'eveniment' && rand('Eveniment', ev ? `${ev.nume} · ${formatData(ev.data)}` : '—')}
+        {task.tag && rand('Tag', <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">{task.tag}</span>)}
         {task.grup_id && rand('Departament', ctx.grupMap[task.grup_id]?.nume)}
         {rand('Responsabil', task.responsabil_id ? ctx.nume(task.responsabil_id) : 'Fără responsabil')}
         {colab.length > 0 && rand('Colaboratori', colab.map(ctx.nume).join(', '))}

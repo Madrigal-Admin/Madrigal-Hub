@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { BarChart3, BookOpen, CalendarDays, ChevronDown, FileText, Home, LayoutGrid, Mail, Package, Receipt, Settings, Users, X as XIcon } from 'lucide-react'
+import { BookOpen, CalendarDays, ChevronDown, FileText, Home, LayoutGrid, Mail, Package, Receipt, Settings, Users, X as XIcon } from 'lucide-react'
 import { CATEGORII_GHID } from '../ghid/categorii'
 import { deschideGhid } from '../ghid/GhidRouter'
 
 // Lista tool-urilor din rândul „Tool-uri". Apar doar cele la care ai acces.
-export function construiesteTooluri({ accesSet, canSeeStatistici, isHubAdmin, onOpenCalendar, onOpenStatistici, onOpenAdmin }) {
+export function construiesteTooluri({ accesSet, isHubAdmin, onOpenCalendar, onOpenAdmin }) {
   return [
     { key: 'calendar', label: 'Calendar', icon: CalendarDays, onClick: onOpenCalendar, view: 'calendar' },
     accesSet.has('hr') && { key: 'hr', label: 'Resurse Umane', icon: Users, href: '/HR/' },
@@ -12,13 +12,12 @@ export function construiesteTooluri({ accesSet, canSeeStatistici, isHubAdmin, on
     accesSet.has('administrativ') && { key: 'administrativ', label: 'Administrativ', icon: Package, href: '/administrativ/' },
     accesSet.has('rapoarte') && { key: 'rapoarte', label: 'Rapoarte', icon: FileText, href: '/rapoarte/' },
     accesSet.has('financiar') && { key: 'financiar', label: 'Financiar', icon: Receipt, href: '/financiar/' },
-    canSeeStatistici && { key: 'statistici', label: 'Statistici evenimente', icon: BarChart3, onClick: onOpenStatistici, view: 'statistici' },
     isHubAdmin && { key: 'admin', label: 'Administrare Hub', icon: Settings, onClick: onOpenAdmin, view: 'admin' },
   ].filter(Boolean)
 }
 
 const pilula = (activ) =>
-  `inline-flex min-h-[44px] items-center gap-2 rounded-full border px-3.5 text-sm font-semibold no-underline focus-ring ${
+  `inline-flex min-h-[44px] shrink-0 items-center gap-2 whitespace-nowrap rounded-full border px-3.5 text-sm font-semibold no-underline focus-ring ${
     activ ? 'border-accent bg-accent text-white' : 'border-[#E1E4EA] bg-white text-accent hover:bg-[#F6F8FB]'
   }`
 
@@ -63,18 +62,21 @@ function MeniuGhid({ className = '' }) {
 
 // Desktop: rândul compact de sub antet. „Acasă" e mereu primul.
 export function RandTooluri({ tooluri, view, onNavigate }) {
+  // Pilulele stau pe un singur rând (dacă nu încap, se derulează pe orizontală);
+  // „Ghidul angajatului" rămâne mereu în dreapta, pe același rând.
   return (
-    <nav aria-label="Tool-uri" className="hidden border-b border-[#E1E4EA] bg-white px-8 py-2.5 sm:flex sm:flex-wrap sm:items-center sm:gap-2">
-      <button type="button" onClick={() => onNavigate('dashboard')} aria-current={view === 'dashboard' ? 'page' : undefined} className={pilula(view === 'dashboard')}>
-        <Home size={18} aria-hidden="true" /> Acasă
-      </button>
-      <span className="mx-1.5 h-6 w-px bg-[#E1E4EA]" aria-hidden="true" />
-      <span className="mr-1.5 text-xs font-bold uppercase tracking-wider text-[#5B6578]">Tool-uri</span>
-      {tooluri.map((t) => (
-        <Element key={t.key} t={t} activ={t.view === view} className={pilula(t.view === view)} />
-      ))}
-      <div className="flex-1" />
-      <MeniuGhid />
+    <nav aria-label="Tool-uri" className="hidden items-center gap-3 border-b border-[#E1E4EA] bg-white px-8 py-2.5 sm:flex">
+      <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto py-0.5 [scrollbar-width:thin]">
+        <button type="button" onClick={() => onNavigate('dashboard')} aria-current={view === 'dashboard' ? 'page' : undefined} className={pilula(view === 'dashboard')}>
+          <Home size={18} aria-hidden="true" /> Acasă
+        </button>
+        <span className="mx-1.5 h-6 w-px shrink-0 bg-[#E1E4EA]" aria-hidden="true" />
+        <span className="mr-1.5 shrink-0 whitespace-nowrap text-xs font-bold uppercase tracking-wider text-[#5B6578]">Tool-uri</span>
+        {tooluri.map((t) => (
+          <Element key={t.key} t={t} activ={t.view === view} className={pilula(t.view === view)} />
+        ))}
+      </div>
+      <MeniuGhid className="shrink-0 whitespace-nowrap" />
     </nav>
   )
 }

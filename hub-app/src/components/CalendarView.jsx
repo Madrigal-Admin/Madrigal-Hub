@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, Settings, Plus, Pencil } from 'lucide-react'
+import { BarChart3, ChevronLeft, ChevronRight, Settings, Plus, Pencil, X } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import EvenimentForm from './EvenimentForm'
 import ListeEvenimente from './ListeEvenimente'
+import StatisticiEvenimente from './StatisticiEvenimente'
 import {
   IMPLICARE_CULORI, ZILE_SAPT, LUNI, formatData, ymd, formatOra, zileEveniment, culoareText, initiale, incarcaTot,
 } from '../lib/evenimente'
@@ -21,7 +22,7 @@ function Chip({ c, children, taiat }) {
   )
 }
 
-export default function CalendarView({ canManageCalendar }) {
+export default function CalendarView({ canManageCalendar, canSeeStatistici }) {
   const [date, setDate] = useState({ evenimente: [], tipuri: [], statusuri: [], angajati: [] })
   const [eroare, setEroare] = useState('')
   const [loading, setLoading] = useState(true)
@@ -30,6 +31,13 @@ export default function CalendarView({ canManageCalendar }) {
   const [localitateFilter, setLocalitateFilter] = useState('')
   const [formDeschis, setFormDeschis] = useState(null) // null | 'nou' | eveniment
   const [showListe, setShowListe] = useState(false)
+  const [showStatistici, setShowStatistici] = useState(false)
+  useEffect(() => {
+    if (!showStatistici) return
+    const la = (e) => e.key === 'Escape' && setShowStatistici(false)
+    window.addEventListener('keydown', la)
+    return () => window.removeEventListener('keydown', la)
+  }, [showStatistici])
   const [lunaCurenta, setLunaCurenta] = useState(() => {
     const azi = new Date()
     return new Date(azi.getFullYear(), azi.getMonth(), 1)
@@ -138,20 +146,32 @@ export default function CalendarView({ canManageCalendar }) {
       <main className="flex-1 max-w-6xl mx-auto px-6 py-8 w-full">
         {eroare && <p className="mb-4 text-sm text-rose-600">{eroare}</p>}
 
-        {canManageCalendar && (
+        {(canManageCalendar || canSeeStatistici) && (
           <div className="mb-5 flex flex-wrap items-center gap-3 bg-white rounded-xl shadow-sm p-4">
-            <button
-              onClick={() => setFormDeschis('nou')}
-              className="flex items-center gap-2 bg-accent hover:bg-accent-hover text-white text-sm font-medium px-4 py-2 rounded-lg transition"
-            >
-              <Plus size={15} /> Eveniment nou
-            </button>
-            <button
-              onClick={() => setShowListe(true)}
-              className="flex items-center gap-2 rounded-lg bg-slate-100 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 transition"
-            >
-              <Settings size={15} /> Tipuri și statusuri
-            </button>
+            {canManageCalendar && (
+              <>
+                <button
+                  onClick={() => setFormDeschis('nou')}
+                  className="flex items-center gap-2 bg-accent hover:bg-accent-hover text-white text-sm font-medium px-4 py-2 rounded-lg transition"
+                >
+                  <Plus size={15} /> Eveniment nou
+                </button>
+                <button
+                  onClick={() => setShowListe(true)}
+                  className="flex items-center gap-2 rounded-lg bg-slate-100 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 transition"
+                >
+                  <Settings size={15} /> Tipuri și statusuri
+                </button>
+              </>
+            )}
+            {canSeeStatistici && (
+              <button
+                onClick={() => setShowStatistici(true)}
+                className="flex items-center gap-2 rounded-lg bg-slate-100 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 transition"
+              >
+                <BarChart3 size={15} /> Statistici evenimente
+              </button>
+            )}
           </div>
         )}
 
@@ -375,6 +395,18 @@ export default function CalendarView({ canManageCalendar }) {
           onClose={() => setFormDeschis(null)}
           onSaved={dupaSalvare}
         />
+      )}
+
+      {showStatistici && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-3 sm:p-6" onClick={() => setShowStatistici(false)}>
+          <div role="dialog" aria-modal="true" aria-label="Statistici evenimente" className="max-h-[calc(100vh-1.5rem)] w-full max-w-6xl overflow-y-auto rounded-2xl bg-[#F6F8FB] shadow-xl sm:max-h-[calc(100vh-3rem)]" onClick={(e) => e.stopPropagation()}>
+            <div className="sticky top-0 z-10 flex items-center justify-between gap-3 rounded-t-2xl border-b border-slate-200 bg-white px-5 py-3">
+              <h2 className="text-lg font-semibold text-slate-800">Statistici evenimente</h2>
+              <button type="button" onClick={() => setShowStatistici(false)} aria-label="Închide" className="flex h-10 w-10 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100"><X size={20} /></button>
+            </div>
+            <StatisticiEvenimente />
+          </div>
+        </div>
       )}
 
       {showListe && (

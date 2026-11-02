@@ -2,11 +2,9 @@ import { useMemo, useState } from 'react'
 import { Plus, Settings } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import TaskuriMele from './home/TaskuriMele'
-import { EvenimenteleMele, TicheteDepartament, UrmatoareleEvenimente } from './home/CarduriDreapta'
+import { EvenimenteleMele, EchipaMea, UrmatoareleEvenimente } from './home/CarduriDreapta'
 import { azi, dataAzi, esteDeschis, grupa, prenume } from './home/date'
 import { useTaskuri } from './taskuri/TaskuriContext'
-
-const URMATORUL = { de_facut: 'in_lucru', in_lucru: 'terminat', terminat: 'de_facut' }
 
 // Homepage orientat pe taskuri. Task nou / detaliu task / checklist se deschid ca ferestre deasupra paginii.
 export default function Dashboard({ angajat, onNavigate, onOpenCalendar }) {
@@ -24,9 +22,8 @@ export default function Dashboard({ angajat, onNavigate, onOpenCalendar }) {
       .map((t) => (suprascrieri[t.id] ? { ...t, status: suprascrieri[t.id] } : t))
   }, [ctx, angajat.id, suprascrieri]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Status la click: De făcut → În lucru → Terminat. Se vede imediat; dacă baza de date refuză, revine.
-  async function cicleaza(t) {
-    const nou = URMATORUL[t.status]
+  // Status ales din meniul rândului. Se vede imediat; dacă baza de date refuză, revine.
+  async function seteazaStatus(t, nou) {
     setEroare('')
     setSuprascrieri((s) => ({ ...s, [t.id]: nou }))
     const { error } = await supabase.rpc('tsk_schimba_status', { p_task: t.id, p_status: nou })
@@ -142,7 +139,15 @@ export default function Dashboard({ angajat, onNavigate, onOpenCalendar }) {
                   taskuri={taskuri}
                   filtru={filtru}
                   setFiltru={setFiltru}
-                  ctx={{ me: angajat, nume: Object.fromEntries(ctx.angajati.map((a) => [a.id, a.nume_complet])), evenimente: evMap, onCicleaza: cicleaza, onDeschide: (t) => acte.deschideTask(t.id) }}
+                  ctx={{
+                    me: angajat,
+                    nume: Object.fromEntries(ctx.angajati.map((a) => [a.id, a.nume_complet])),
+                    evenimente: evMap,
+                    onStatus: seteazaStatus,
+                    onDeschide: (t) => acte.deschideTask(t.id),
+                    poateStatus: (t) => ctx.poateSchimbaStatus(t) && !ctx.evenimentAnulat(t.eveniment_id),
+                    poateAnula: (t) => ctx.poateGestiona(t),
+                  }}
                 />
               ) : (
                 <p className="text-sm text-[#5B6578]">Se încarcă taskurile…</p>
@@ -150,7 +155,7 @@ export default function Dashboard({ angajat, onNavigate, onOpenCalendar }) {
             </div>
             <aside className="flex min-w-0 flex-[1_1_340px] flex-col gap-6">
               <EvenimenteleMele evenimente={evenimenteleMele} progres={progres} statusuri={ctx?.statusuri || []} onStart={(e) => acte.checklist('start', e)} onToate={() => onNavigate('evenimente')} />
-              <TicheteDepartament departamente={departamente} onToate={() => onNavigate('departament')} />
+              <EchipaMea departamente={departamente} onToate={() => onNavigate('departament')} />
               {ctx && <UrmatoareleEvenimente evenimente={urmatoare} onOpenCalendar={onOpenCalendar} />}
             </aside>
           </div>

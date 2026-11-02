@@ -52,12 +52,12 @@ export function EvenimenteleMele({ evenimente, progres, statusuri, onStart, onTo
   )
 }
 
-export function TicheteDepartament({ departamente, onToate }) {
+export function EchipaMea({ departamente, onToate }) {
   if (departamente.length === 0) return null
   return (
-    <section aria-label="Tichete departament" className={carcasa}>
+    <section aria-label="Echipa mea" className={carcasa}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-        <h2 className="text-[19px] font-extrabold">Tichete departament</h2>
+        <h2 className="text-[19px] font-extrabold">Echipa mea</h2>
         <span className="text-xs font-semibold text-[#5B6578]">Sunt coordonator departament</span>
       </div>
       {departamente.map((d) => {
@@ -81,7 +81,7 @@ export function TicheteDepartament({ departamente, onToate }) {
           </div>
         )
       })}
-      <button type="button" onClick={onToate} className="mt-3.5 inline-block py-3 text-sm font-bold text-accent hover:underline">Vezi taskurile departamentului →</button>
+      <button type="button" onClick={onToate} className="mt-3.5 inline-block py-3 text-sm font-bold text-accent hover:underline">Vezi echipa mea →</button>
     </section>
   )
 }

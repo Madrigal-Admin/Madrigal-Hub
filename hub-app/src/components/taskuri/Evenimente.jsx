@@ -5,12 +5,15 @@ import { estePrelucrat, formatData, mesajEroare, esteIntarziat } from '../../lib
 import { culoareText } from '../../lib/evenimente'
 import { Gol } from './Mici'
 import TaskLista from './TaskLista'
+import DashboardEvenimente from './DashboardTaskuri'
+import SelectorEvenimente from './SelectorEvenimente'
 
 // „Evenimentele mele": progresul fiecărui eveniment la care ești PM (adminul le vede pe toate).
 export default function Evenimente({ ctx, onOpen, onTaskNou, onChecklist }) {
   const [toate, setToate] = useState(false)
   const [deschise, setDeschise] = useState(() => new Set())
   const [eroare, setEroare] = useState('')
+  const [selectate, setSelectate] = useState(() => new Set()) // gol = toate
 
   const lista = useMemo(() => {
     const baza = ctx.admin ? ctx.evenimente : ctx.evenimenteMele
@@ -18,6 +21,16 @@ export default function Evenimente({ ctx, onOpen, onTaskNou, onChecklist }) {
       .filter((e) => toate || ['deschis', 'organizare'].includes(ctx.comportament(e.id)))
       .sort((a, b) => (a.data || '').localeCompare(b.data || ''))
   }, [ctx, toate])
+
+  // evenimentele alese în selector (dacă nu e ales niciunul, toate cele din listă)
+  const afisate = useMemo(() => {
+    const alese = lista.filter((e) => selectate.has(e.id))
+    return selectate.size && alese.length ? alese : lista
+  }, [lista, selectate])
+  const taskuriDashboard = useMemo(() => {
+    const ids = new Set(afisate.map((e) => e.id))
+    return ctx.taskuri.filter((t) => ids.has(t.eveniment_id))
+  }, [ctx, afisate])
 
   async function status(e, cod) {
     setEroare('')
@@ -35,18 +48,20 @@ export default function Evenimente({ ctx, onOpen, onTaskNou, onChecklist }) {
         <p className="text-sm text-slate-500">
           {ctx.admin ? 'Toate evenimentele.' : 'Evenimentele la care ești PM.'}
         </p>
+        <SelectorEvenimente evenimente={lista} selectate={selectate} onChange={setSelectate} />
         <label className="ml-auto flex items-center gap-2 text-sm text-slate-600">
           <input type="checkbox" checked={toate} onChange={(e) => setToate(e.target.checked)} />
           Arată și evenimentele finalizate / anulate
         </label>
       </div>
+      {lista.length > 0 && <DashboardEvenimente taskuri={taskuriDashboard} ctx={ctx} />}
       {eroare && <p className="mb-3 whitespace-pre-wrap text-sm text-rose-600">{eroare}</p>}
 
       {lista.length === 0 ? (
         <Gol>{ctx.admin ? 'Nu există evenimente active.' : 'Nu ești PM la niciun eveniment activ.'}</Gol>
       ) : (
         <div className="space-y-3">
-          {lista.map((e) => {
+          {afisate.map((e) => {
             const st = ctx.statusMap[e.status]
             const comp = st?.comportament
             const taskuri = ctx.taskuri.filter((t) => t.eveniment_id === e.id)

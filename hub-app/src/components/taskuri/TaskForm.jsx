@@ -3,6 +3,7 @@ import { supabase } from '../../supabaseClient'
 import { PRIORITATI, inputCls, labelCls, mesajEroare } from '../../lib/taskuri/ui'
 import AngajatiPicker from './AngajatiPicker'
 import EvenimentPicker from './EvenimentPicker'
+import TagPicker from './TagPicker'
 import { Modal } from './Mici'
 
 // Creare / editare task. La editare, tipul și evenimentul nu se mai pot schimba.
@@ -30,6 +31,7 @@ export default function TaskForm({ ctx, task, evenimentImplicit, onClose, onSave
     termen: task?.termen || '',
     prioritate: task?.prioritate || 'medie',
     link_document: task?.link_document || '',
+    tag: task?.tag || '',
   }))
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -62,6 +64,7 @@ export default function TaskForm({ ctx, task, evenimentImplicit, onClose, onSave
       termen: f.termen || null,
       prioritate: f.prioritate,
       link_document: f.link_document.trim() || null,
+      tag: f.tag.trim() || null,
       ...(f.tip === 'operational' ? { grup_id: f.grup_id || null } : {}),
     }
     let id = task?.id
@@ -144,6 +147,12 @@ export default function TaskForm({ ctx, task, evenimentImplicit, onClose, onSave
             </select>
           </div>
         )}
+
+        <div>
+          <label className={labelCls}>Tag (opțional)</label>
+          <TagPicker ctx={ctx} valoare={f.tag} onChange={(v) => set('tag', v)} />
+          <p className="mt-1 text-xs text-slate-400">Categoria taskului (ex. Comunicare, Organizare). Poți alege din listă sau crea un tag nou.</p>
+        </div>
 
         <div>
           <label className={labelCls}>Descriere</label>
