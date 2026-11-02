@@ -4,6 +4,7 @@ import { supabase } from '../supabaseClient'
 import EvenimentForm from './EvenimentForm'
 import ListeEvenimente from './ListeEvenimente'
 import StatisticiEvenimente from './StatisticiEvenimente'
+import FiltruMulti from './FiltruMulti'
 import {
   IMPLICARE_CULORI, ZILE_SAPT, LUNI, formatData, ymd, formatOra, zileEveniment, culoareText, initiale, incarcaTot,
 } from '../lib/evenimente'
@@ -26,9 +27,11 @@ export default function CalendarView({ canManageCalendar, canSeeStatistici }) {
   const [date, setDate] = useState({ evenimente: [], tipuri: [], statusuri: [], angajati: [] })
   const [eroare, setEroare] = useState('')
   const [loading, setLoading] = useState(true)
-  const [tipFilter, setTipFilter] = useState(null) // null = toate; altfel Set<cod>
-  const [statusFilter, setStatusFilter] = useState('')
-  const [localitateFilter, setLocalitateFilter] = useState('')
+  // filtre cu selecție multiplă; set gol = fără filtru (toate)
+  const [tipFilter, setTipFilter] = useState(() => new Set())
+  const [statusFilter, setStatusFilter] = useState(() => new Set())
+  const [localitateFilter, setLocalitateFilter] = useState(() => new Set())
+  const [calitateFilter, setCalitateFilter] = useState(() => new Set())
   const [formDeschis, setFormDeschis] = useState(null) // null | 'nou' | eveniment
   const [showListe, setShowListe] = useState(false)
   const [showStatistici, setShowStatistici] = useState(false)
@@ -66,32 +69,21 @@ export default function CalendarView({ canManageCalendar, canSeeStatistici }) {
     [evenimente]
   )
 
-  const tipuriActive = tipFilter === null ? new Set(tipuri.map((t) => t.cod)) : tipFilter
-
-  function toggleTipFilter(cod) {
-    setTipFilter((prev) => {
-      const curent = prev === null ? new Set(tipuri.map((t) => t.cod)) : new Set(prev)
-      if (curent.has(cod)) curent.delete(cod)
-      else curent.add(cod)
-      return curent
-    })
-  }
-
   async function toggleFlag(id, field, value) {
     setDate((prev) => ({ ...prev, evenimente: prev.evenimente.map((e) => (e.id === id ? { ...e, [field]: value } : e)) }))
     await supabase.from('evenimente').update({ [field]: value }).eq('id', id)
   }
 
-  // Evenimentele fără niciun tip rămân mereu vizibile — filtrul de tip se aplică doar celor cu tip.
   const evenimenteVizibile = useMemo(
     () =>
       evenimente.filter(
         (e) =>
-          (!e.tipuri.length || e.tipuri.some((c) => tipuriActive.has(c))) &&
-          (!statusFilter || e.status === statusFilter) &&
-          (!localitateFilter || (e.localitate || '').trim() === localitateFilter)
+          (tipFilter.size === 0 || e.tipuri.some((c) => tipFilter.has(c))) &&
+          (statusFilter.size === 0 || statusFilter.has(e.status)) &&
+          (localitateFilter.size === 0 || localitateFilter.has((e.localitate || '').trim())) &&
+          (calitateFilter.size === 0 || calitateFilter.has(e.implicare))
       ),
-    [evenimente, tipuriActive, statusFilter, localitateFilter]
+    [evenimente, tipFilter, statusFilter, localitateFilter, calitateFilter]
   )
 
   const evenimenteByDate = useMemo(() => {
@@ -167,7 +159,7 @@ export default function CalendarView({ canManageCalendar, canSeeStatistici }) {
             {canSeeStatistici && (
               <button
                 onClick={() => setShowStatistici(true)}
-                className="flex items-center gap-2 rounded-lg bg-slate-100 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 transition"
+                className="ml-auto flex items-center gap-2 rounded-lg bg-[#DDF0E4] px-4 py-2 text-sm font-semibold text-[#1E6B43] transition hover:bg-[#CBE7D6]"
               >
                 <BarChart3 size={15} /> Statistici evenimente
               </button>
@@ -176,47 +168,32 @@ export default function CalendarView({ canManageCalendar, canSeeStatistici }) {
         )}
 
         <div className="mb-5 flex flex-wrap items-center gap-2 bg-white rounded-xl shadow-sm p-3">
-          <span className="text-xs font-medium text-slate-500 mr-1">Tipuri:</span>
-          {tipuri
-            .filter((t) => t.activ || evenimente.some((e) => e.tipuri.includes(t.cod)))
-            .map((t) => {
-              const activ = tipuriActive.has(t.cod)
-              return (
-                <button
-                  key={t.cod}
-                  onClick={() => toggleTipFilter(t.cod)}
-                  className="flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium transition"
-                  style={{ backgroundColor: activ ? `${t.culoare}22` : '#f1f5f9', color: activ ? culoareText(t.culoare) : '#94a3b8' }}
-                >
-                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: activ ? t.culoare : '#cbd5e1' }} />
-                  {t.nume}
-                </button>
-              )
-            })}
-          <div className="ml-auto flex flex-wrap items-center gap-2">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600"
-              aria-label="Filtru status"
+          <span className="mr-1 text-xs font-medium text-slate-500">Filtrează:</span>
+          <FiltruMulti
+            eticheta="Tipuri" toate="Toate tipurile" selectat={tipFilter} onChange={setTipFilter}
+            optiuni={tipuri.filter((t) => t.activ || evenimente.some((e) => e.tipuri.includes(t.cod))).map((t) => ({ valoare: t.cod, eticheta: t.nume, culoare: t.culoare }))}
+          />
+          <FiltruMulti
+            eticheta="Statusuri" toate="Toate statusurile" selectat={statusFilter} onChange={setStatusFilter}
+            optiuni={statusuri.map((s) => ({ valoare: s.cod, eticheta: s.nume, culoare: s.culoare }))}
+          />
+          <FiltruMulti
+            eticheta="Localități" toate="Toate localitățile" selectat={localitateFilter} onChange={setLocalitateFilter}
+            optiuni={localitati.map((l) => ({ valoare: l, eticheta: l }))}
+          />
+          <FiltruMulti
+            eticheta="Calitate" toate="Toate calitățile" selectat={calitateFilter} onChange={setCalitateFilter}
+            optiuni={Object.entries(IMPLICARE_CULORI).map(([k, c]) => ({ valoare: k, eticheta: k, culoare: c }))}
+          />
+          {(tipFilter.size > 0 || statusFilter.size > 0 || localitateFilter.size > 0 || calitateFilter.size > 0) && (
+            <button
+              type="button"
+              onClick={() => { setTipFilter(new Set()); setStatusFilter(new Set()); setLocalitateFilter(new Set()); setCalitateFilter(new Set()) }}
+              className="rounded-lg px-2 py-1.5 text-xs font-semibold text-[#22406B] hover:bg-slate-100"
             >
-              <option value="">Toate statusurile</option>
-              {statusuri.map((s) => (
-                <option key={s.cod} value={s.cod}>{s.nume}</option>
-              ))}
-            </select>
-            <select
-              value={localitateFilter}
-              onChange={(e) => setLocalitateFilter(e.target.value)}
-              className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600"
-              aria-label="Filtru localitate"
-            >
-              <option value="">Toate localitățile</option>
-              {localitati.map((l) => (
-                <option key={l} value={l}>{l}</option>
-              ))}
-            </select>
-          </div>
+              Șterge toate filtrele
+            </button>
+          )}
         </div>
 
         {loading ? (

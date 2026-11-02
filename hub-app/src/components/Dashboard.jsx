@@ -3,11 +3,12 @@ import { Plus, Settings } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import TaskuriMele from './home/TaskuriMele'
 import { EvenimenteleMele, EchipaMea, UrmatoareleEvenimente } from './home/CarduriDreapta'
-import { azi, dataAzi, esteDeschis, grupa, prenume } from './home/date'
+import { azi, dataAzi, esteDeschis, grupa, plusZile, prenume } from './home/date'
+import FaraTaskuri from './home/FaraTaskuri'
 import { useTaskuri } from './taskuri/TaskuriContext'
 
 // Homepage orientat pe taskuri. Task nou / detaliu task / checklist se deschid ca ferestre deasupra paginii.
-export default function Dashboard({ angajat, onNavigate, onOpenCalendar }) {
+export default function Dashboard({ angajat, tooluri = [], onNavigate, onOpenCalendar }) {
   const { ctx, acte, eroare: eroareIncarcare, areTaskuri } = useTaskuri()
   const [filtru, setFiltru] = useState('Toate')
   const [suprascrieri, setSuprascrieri] = useState({}) // id -> status afișat imediat, până se confirmă
@@ -69,7 +70,10 @@ export default function Dashboard({ angajat, onNavigate, onOpenCalendar }) {
       }))
   }, [ctx])
 
-  const urmatoare = evenimente.filter((e) => ctx.comportament(e.id) !== 'anulat' && (e.data_sfarsit || e.data) >= azi()).slice(0, 4)
+  const urmatoareToate = ctx
+    ? evenimente.filter((e) => ctx.comportament(e.id) !== 'anulat' && (e.data_sfarsit || e.data) >= azi()).sort((x, y) => (x.data || '').localeCompare(y.data || ''))
+    : []
+  const urmatoare = urmatoareToate.slice(0, 4)
 
   const poateCrea = !!ctx && (ctx.poateEveniment || ctx.poateOperational)
   const esteAdminTaskuri = !!ctx?.admin
@@ -82,7 +86,12 @@ export default function Dashboard({ angajat, onNavigate, onOpenCalendar }) {
 
   const rezumat = areTaskuri
     ? `${nrIntarziate ? `${nrIntarziate} ${nrIntarziate === 1 ? 'task întârziat' : 'taskuri întârziate'}` : 'niciun task întârziat'} · ${nrAzi ? `${nrAzi} ${nrAzi === 1 ? 'scadent azi' : 'scadente azi'}` : 'nimic scadent azi'}`
-    : 'Tool-urile tale sunt în rândul de mai sus'
+    : urmatoareToate.length
+      ? (() => {
+          const n = urmatoareToate.filter((e) => e.data <= plusZile(7)).length
+          return n === 0 ? 'Niciun eveniment în următoarele 7 zile' : `${n} ${n === 1 ? 'eveniment' : 'evenimente'} în următoarele 7 zile`
+        })()
+      : 'Niciun eveniment programat în curând'
 
   const casete = [
     ['Întârziate', nrIntarziate, 'au nevoie de atenție', nrIntarziate ? 'text-[#B4332E]' : '', ''],
@@ -117,12 +126,18 @@ export default function Dashboard({ angajat, onNavigate, onOpenCalendar }) {
       {(eroare || eroareIncarcare) && <p className="text-sm text-rose-600">{eroare || eroareIncarcare}</p>}
 
       {!areTaskuri ? (
-        <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
-          <div className="rounded-[14px] border border-[#E1E4EA] bg-white p-6 text-sm text-[#5B6578]">
-            Nu ai încă acces la Taskuri. Dacă ai nevoie, cere unui administrator să-ți dea acces din Hub, la „Acces Tool-uri”. Tool-urile la care ai acces sunt în rândul de sus.
-          </div>
-          {ctx && <UrmatoareleEvenimente evenimente={urmatoare} onOpenCalendar={onOpenCalendar} />}
-        </div>
+        ctx ? (
+          <FaraTaskuri
+            angajat={angajat}
+            evenimente={urmatoareToate.slice(0, 5)}
+            toateEvenimentele={evenimente.filter((e) => ctx.comportament(e.id) !== 'anulat')}
+            tooluri={tooluri}
+            onOpenCalendar={onOpenCalendar}
+            onNavigate={onNavigate}
+          />
+        ) : (
+          <p className="text-sm text-[#5B6578]">Se încarcă…</p>
+        )
       ) : (
         <>
           <div className="flex flex-wrap gap-3 sm:gap-4">

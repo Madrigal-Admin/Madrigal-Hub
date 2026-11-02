@@ -185,7 +185,7 @@ export default function AdminAccesTooluri() {
         </div>
       )}
       {bulkMesaj && <p className="mb-3 text-sm text-slate-600">{bulkMesaj}</p>}
-      <div className="bg-white rounded-xl shadow-sm overflow-x-auto">
+      <div className="bg-white rounded-xl shadow-sm overflow-auto max-h-[calc(100vh-14rem)] [&_th]:sticky [&_th]:top-0 [&_th]:z-[1] [&_th]:bg-slate-50">
         <table className="w-full text-sm min-w-[620px]">
           <thead className="bg-slate-50 text-slate-500 text-left">
             <tr>

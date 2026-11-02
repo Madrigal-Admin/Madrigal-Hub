@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight } from 'lucide-react'
 import AdminAngajati from './AdminAngajati'
 import AdminAccesTooluri from './AdminAccesTooluri'
 import AdminDepartamenteFunctii from './AdminDepartamenteFunctii'
+import AdminZileLibere from './AdminZileLibere'
 import AdminGhidEchipa from './AdminGhidEchipa'
 import AdminGhidDespre from './AdminGhidDespre'
 import AdminGhidAcordeon from './AdminGhidAcordeon'
@@ -16,6 +17,7 @@ const MENU = [
     items: [
       { key: 'angajati', label: 'Angajați' },
       { key: 'departamente', label: 'Departamente & Funcții' },
+      { key: 'zile-libere', label: 'Zile libere legale' },
     ],
   },
   {
@@ -91,6 +93,7 @@ export default function AdminLayout() {
           {active === 'angajati' && <AdminAngajati />}
           {active === 'acces' && <AdminAccesTooluri />}
           {active === 'departamente' && <AdminDepartamenteFunctii />}
+          {active === 'zile-libere' && <AdminZileLibere />}
           {active === 'ghid-despre' && <AdminGhidDespre />}
           {active === 'ghid-echipa' && <AdminGhidEchipa />}
           {active === 'ghid-info-utile' && (
