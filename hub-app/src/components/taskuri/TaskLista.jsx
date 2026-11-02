@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
-import { Search, CalendarDays, User, Layers } from 'lucide-react'
-import { supabase } from '../../supabaseClient'
-import { STATUSURI, esteIntarziat, estePrelucrat, formatData, inputCls, mesajEroare, sorteaza } from '../../lib/taskuri/ui'
-import { Gol, Prioritate, StatusBadge } from './Mici'
+import { Search } from 'lucide-react'
+import { STATUSURI, esteIntarziat, estePrelucrat, inputCls, sorteaza } from '../../lib/taskuri/ui'
+import { Gol } from './Mici'
+import TabelTaskuri from './TabelTaskuri'
 
 // Lista de taskuri cu filtre. Statusul se schimbă direct din listă (prin funcția din baza de date).
 export default function TaskLista({ taskuri, ctx, onOpen, arataEveniment = true, arataResponsabil = true }) {
@@ -29,13 +29,6 @@ export default function TaskLista({ taskuri, ctx, onOpen, arataEveniment = true,
       })
     )
   }, [taskuri, text, filtruStatus, resp, ctx])
-
-  async function schimba(t, status) {
-    setEroare('')
-    const { error } = await supabase.rpc('tsk_schimba_status', { p_task: t.id, p_status: status })
-    if (error) setEroare(mesajEroare(error, 'Nu am putut schimba statusul.'))
-    await ctx.reload()
-  }
 
   return (
     <div>
@@ -69,49 +62,9 @@ export default function TaskLista({ taskuri, ctx, onOpen, arataEveniment = true,
       {vizibile.length === 0 ? (
         <Gol>{taskuri.length === 0 ? 'Nu există taskuri aici încă.' : 'Niciun task pentru filtrele alese.'}</Gol>
       ) : (
-        <ul className="divide-y divide-slate-100 overflow-hidden rounded-xl bg-white shadow-sm">
-          {vizibile.map((t) => {
-            const ev = ctx.evMap[t.eveniment_id]
-            const intarziat = esteIntarziat(t)
-            const poate = ctx.poateSchimbaStatus(t) && !ctx.inghetat(t) && !(t.tip === 'eveniment' && ctx.evenimentAnulat(t.eveniment_id))
-            return (
-              <li key={t.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 hover:bg-slate-50">
-                <button type="button" onClick={() => onOpen(t)} className="min-w-[220px] flex-1 text-left">
-                  <p className={`text-sm font-medium ${t.status === 'terminat' || t.status === 'anulat' ? 'text-slate-400 line-through' : 'text-slate-800'}`}>{t.titlu}</p>
-                  <p className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-slate-500">
-                    {arataEveniment && t.tip === 'eveniment' && ev && (
-                      <span className="inline-flex items-center gap-1"><CalendarDays size={12} /> {ev.nume}</span>
-                    )}
-                    {t.tip === 'operational' && (
-                      <span className="inline-flex items-center gap-1"><Layers size={12} /> {ctx.grupMap[t.grup_id]?.nume || 'Operațional'}</span>
-                    )}
-                    {arataResponsabil && (
-                      <span className="inline-flex items-center gap-1"><User size={12} /> {t.responsabil_id ? ctx.nume(t.responsabil_id) : 'Fără responsabil'}</span>
-                    )}
-                  </p>
-                </button>
-                <span className={`text-xs ${intarziat ? 'font-semibold text-rose-600' : 'text-slate-500'}`} title={intarziat ? 'Termen depășit' : 'Termen'}>
-                  {t.termen ? formatData(t.termen) : 'Fără termen'}
-                </span>
-                <Prioritate valoare={t.prioritate} />
-                {poate ? (
-                  <select
-                    value={t.status}
-                    onChange={(e) => schimba(t, e.target.value)}
-                    className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs"
-                    aria-label="Schimbă statusul"
-                  >
-                    {STATUSURI.filter((s) => s.cod !== 'anulat' || ctx.poateGestiona(t)).map((s) => (
-                      <option key={s.cod} value={s.cod}>{s.nume}</option>
-                    ))}
-                  </select>
-                ) : (
-                  <StatusBadge status={t.status} />
-                )}
-              </li>
-            )
-          })}
-        </ul>
+        <div className="overflow-hidden rounded-xl bg-white shadow-sm">
+          <TabelTaskuri taskuri={vizibile} ctx={ctx} onOpen={onOpen} onEroare={setEroare} arataEveniment={arataEveniment} />
+        </div>
       )}
     </div>
   )

@@ -1,4 +1,4 @@
-import { GRUPE, dataScurta, esteDeschis, grupa, prenume } from './date'
+import { GRUPE, dataScurta, esteDeschis, grupa } from './date'
 import StatusDropdown from '../taskuri/StatusDropdown'
 
 const PRIORITATE = {
@@ -8,7 +8,7 @@ const PRIORITATE = {
 }
 
 // Același șablon de coloane pe antet și pe rânduri
-const COLOANE = 'grid grid-cols-[112px_minmax(0,1fr)_84px_132px_84px] items-center gap-x-3'
+const COLOANE = 'grid grid-cols-[112px_minmax(0,1fr)_84px_148px_148px_84px] items-center gap-x-3'
 
 function Eticheta({ t, evenimente }) {
   if (t.tip === 'eveniment') {
@@ -29,7 +29,7 @@ function Responsabil({ t, ctx }) {
   return (
     <span className="flex min-w-0 items-center gap-2 text-[13px] text-[#172036]" title={nume}>
       <span aria-hidden="true" className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#E4ECF8] text-[11px] font-bold text-accent">{nume.trim().charAt(0).toUpperCase()}</span>
-      <span className="truncate">{t.responsabil_id === ctx.me.id ? 'Eu' : prenume(nume)}</span>
+      <span className="truncate">{nume}</span>
     </span>
   )
 }
@@ -64,6 +64,7 @@ function Rand({ t, g, ctx }) {
         </div>
         <div className={`text-[13px] font-bold ${g === 'Întârziate' ? 'text-[#B4332E]' : 'text-[#172036]'}`}>{textTermen(t, g)}</div>
         <Responsabil t={t} ctx={ctx} />
+        <span className="min-w-0 truncate text-[13px] text-[#172036]" title={ctx.nume[t.creat_de] || ''}>{ctx.nume[t.creat_de] || '—'}</span>
         <div className="flex items-center gap-1.5 text-[13px] text-[#5B6578]">
           <span className="inline-block h-2 w-2 rounded-full" style={{ background: p.culoare }} />
           {p.nume}
@@ -111,7 +112,7 @@ export default function TaskuriMele({ taskuri, filtru, setFiltru, ctx }) {
 
       {grupe.length > 0 && (
         <div className={`${COLOANE} hidden border-t border-[#E1E4EA] bg-[#F6F8FB] px-5 py-1.5 text-xs font-bold uppercase tracking-wider text-[#5B6578] sm:grid`} role="row">
-          <span>Status</span><span>Titlu</span><span>Deadline</span><span>Responsabil</span><span>Prioritate</span>
+          <span>Status</span><span>Titlu</span><span>Deadline</span><span>Responsabil</span><span>Deschis de</span><span>Prioritate</span>
         </div>
       )}
 
