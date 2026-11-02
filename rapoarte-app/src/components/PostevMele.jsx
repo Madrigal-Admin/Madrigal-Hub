@@ -52,6 +52,8 @@ export default function PostevMele({ angajat, role }) {
   if (pas === 'alege') {
     return (
       <EvenimentPicker
+        angajatId={angajat?.id}
+        vedeTot={role === 'admin_postev' || role === 'admin_general'}
         onCancel={inapoi}
         onAlege={(e) => { setEveniment(e); setPas('formular') }}
         onManual={() => { setEveniment(null); setPas('formular') }}
