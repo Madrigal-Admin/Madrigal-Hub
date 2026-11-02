@@ -1,7 +1,4 @@
 import { useEffect, useMemo, useState } from 'react'
-import { LogOut, ArrowLeft } from 'lucide-react'
-import SiteHeader from './SiteHeader'
-import SiteFooter from './SiteFooter'
 import { LUNI, PALETA, culoareText, incarcaTot } from '../lib/evenimente'
 
 const selectCls = 'rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700'
@@ -83,7 +80,7 @@ function Bare({ elemente }) {
   )
 }
 
-export default function StatisticiEvenimente({ angajat, onBack, onSignOut }) {
+export default function StatisticiEvenimente() {
   const [date, setDate] = useState(null)
   const [eroare, setEroare] = useState('')
   const [an, setAn] = useState(String(new Date().getFullYear()))
@@ -164,27 +161,8 @@ export default function StatisticiEvenimente({ angajat, onBack, onSignOut }) {
   const maxLuna = Math.max(1, ...peLuna.map((l) => l.valoare))
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
-      <SiteHeader
-        title="Statistici evenimente"
-        right={
-          <div className="flex items-center gap-2">
-            <span className="hidden max-w-[220px] truncate rounded-full bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-500 sm:inline-block">
-              {angajat.nume_complet}
-            </span>
-            <button onClick={onSignOut} className="flex items-center gap-1.5 rounded-full px-3 py-1.5 font-medium text-slate-500 hover:bg-slate-100 focus-ring transition" title="Deconectare">
-              <LogOut size={15} />
-            </button>
-          </div>
-        }
-      />
-
+    <div className="flex flex-1 flex-col">
       <main className="flex-1 max-w-6xl mx-auto px-6 py-8 w-full">
-        <button type="button" onClick={onBack} className="hub-back mb-4">
-          <ArrowLeft size={15} />
-          Înapoi la Hub
-        </button>
-
         {eroare && <p className="mb-4 text-sm text-rose-600">{eroare}</p>}
 
         <div className="mb-5 flex flex-wrap items-center gap-3 rounded-xl bg-white p-4 shadow-sm">
@@ -256,7 +234,6 @@ export default function StatisticiEvenimente({ angajat, onBack, onSignOut }) {
         )}
       </main>
 
-      <SiteFooter />
     </div>
   )
 }

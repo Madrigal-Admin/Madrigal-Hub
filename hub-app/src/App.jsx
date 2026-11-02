@@ -5,6 +5,10 @@ import Dashboard from './components/Dashboard'
 import AdminLayout from './components/AdminLayout'
 import CalendarView from './components/CalendarView'
 import StatisticiEvenimente from './components/StatisticiEvenimente'
+import Shell from './components/Shell'
+import { construiesteTooluri } from './components/home/NavigareTooluri'
+import { TaskuriProvider } from './components/taskuri/TaskuriContext'
+import { PaginaDepartament, PaginaEvenimente, PaginaSetari } from './components/taskuri/Pagini'
 
 export default function App() {
   const [session, setSession] = useState(undefined) // undefined = încă neverificat
@@ -126,48 +130,41 @@ export default function App() {
   const isHubAdmin = accesTooluri.some((a) => a.tool === 'hub' && a.rol === 'admin')
   const canManageCalendar = isHubAdmin || accesTooluri.some((a) => a.tool === 'calendar' && a.rol === 'admin')
   const canSeeStatistici = canManageCalendar || accesTooluri.some((a) => a.tool === 'calendar' && a.rol === 'statistici')
+  const rolTaskuri = accesTooluri.find((a) => a.tool === 'taskuri')?.rol || null
+  const accesSet = new Set(accesTooluri.map((a) => a.tool))
 
-  if (view === 'admin' && isHubAdmin) {
-    return (
-      <AdminLayout
-        angajat={angajat}
-        onBackToDashboard={() => navigateTo('dashboard')}
-        onSignOut={handleSignOut}
-      />
-    )
+  // Doar paginile la care ai voie; orice altceva te duce acasă.
+  const permise = {
+    dashboard: true,
+    calendar: true,
+    statistici: canSeeStatistici,
+    admin: isHubAdmin,
+    evenimente: !!rolTaskuri,
+    departament: !!rolTaskuri,
+    setari: rolTaskuri === 'admin',
   }
+  const viewEfectiv = permise[view] ? view : 'dashboard'
 
-  if (view === 'calendar') {
-    return (
-      <CalendarView
-        angajat={angajat}
-        canManageCalendar={canManageCalendar}
-        onBack={() => navigateTo('dashboard')}
-        onSignOut={handleSignOut}
-      />
-    )
-  }
-
-  if (view === 'statistici' && canSeeStatistici) {
-    return (
-      <StatisticiEvenimente
-        angajat={angajat}
-        onBack={() => navigateTo('dashboard')}
-        onSignOut={handleSignOut}
-      />
-    )
-  }
+  const tooluri = construiesteTooluri({
+    accesSet,
+    canSeeStatistici,
+    isHubAdmin,
+    onOpenCalendar: () => navigateTo('calendar'),
+    onOpenStatistici: () => navigateTo('statistici'),
+    onOpenAdmin: () => navigateTo('admin'),
+  })
 
   return (
-    <Dashboard
-      angajat={angajat}
-      accesTooluri={accesTooluri}
-      isHubAdmin={isHubAdmin}
-      onOpenAdmin={() => navigateTo('admin')}
-      onOpenCalendar={() => navigateTo('calendar')}
-      canSeeStatistici={canSeeStatistici}
-      onOpenStatistici={() => navigateTo('statistici')}
-      onSignOut={handleSignOut}
-    />
+    <TaskuriProvider angajat={angajat} accesTooluri={accesTooluri}>
+      <Shell angajat={angajat} tooluri={tooluri} view={viewEfectiv} onNavigate={navigateTo} onSignOut={handleSignOut}>
+        {viewEfectiv === 'dashboard' && <Dashboard angajat={angajat} onNavigate={navigateTo} onOpenCalendar={() => navigateTo('calendar')} />}
+        {viewEfectiv === 'calendar' && <CalendarView canManageCalendar={canManageCalendar} />}
+        {viewEfectiv === 'statistici' && <StatisticiEvenimente />}
+        {viewEfectiv === 'admin' && <AdminLayout />}
+        {viewEfectiv === 'evenimente' && <PaginaEvenimente />}
+        {viewEfectiv === 'departament' && <PaginaDepartament />}
+        {viewEfectiv === 'setari' && <PaginaSetari />}
+      </Shell>
+    </TaskuriProvider>
   )
 }

@@ -1,4 +1,4 @@
-import { ArrowLeft } from 'lucide-react'
+import { Home } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
 import Navbar from './components/Navbar'
@@ -102,8 +102,8 @@ export default function App() {
 
         <main className="flex-1 p-6 md:p-8 min-w-0">
           <a href="/" className="hub-back mb-4">
-            <ArrowLeft size={15} />
-            Înapoi la Hub
+            <Home size={15} />
+            Acasă
           </a>
           <div className="w-full">
             {checkingRole && <p className="text-sm text-slate-500">Se verifică contul…</p>}

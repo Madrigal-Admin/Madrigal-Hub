@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { LogOut, ChevronLeft, ChevronRight, ArrowLeft, Settings, Plus, Pencil } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Settings, Plus, Pencil } from 'lucide-react'
 import { supabase } from '../supabaseClient'
-import SiteHeader from './SiteHeader'
-import SiteFooter from './SiteFooter'
 import EvenimentForm from './EvenimentForm'
 import ListeEvenimente from './ListeEvenimente'
 import {
@@ -23,7 +21,7 @@ function Chip({ c, children, taiat }) {
   )
 }
 
-export default function CalendarView({ angajat, canManageCalendar, onBack, onSignOut }) {
+export default function CalendarView({ canManageCalendar }) {
   const [date, setDate] = useState({ evenimente: [], tipuri: [], statusuri: [], angajati: [] })
   const [eroare, setEroare] = useState('')
   const [loading, setLoading] = useState(true)
@@ -136,31 +134,8 @@ export default function CalendarView({ angajat, canManageCalendar, onBack, onSig
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col">
-      <SiteHeader
-        title="Calendar Evenimente"
-        right={
-          <div className="flex items-center gap-2">
-            <span className="hidden max-w-[220px] truncate rounded-full bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-500 sm:inline-block">
-              {angajat.nume_complet}
-            </span>
-            <button
-              onClick={onSignOut}
-              className="flex items-center gap-1.5 rounded-full px-3 py-1.5 font-medium text-slate-500 hover:bg-slate-100 focus-ring transition"
-              title="Deconectare"
-            >
-              <LogOut size={15} />
-            </button>
-          </div>
-        }
-      />
-
+    <div className="flex flex-1 flex-col">
       <main className="flex-1 max-w-6xl mx-auto px-6 py-8 w-full">
-        <button type="button" onClick={onBack} className="hub-back mb-4">
-          <ArrowLeft size={15} />
-          Înapoi la Hub
-        </button>
-
         {eroare && <p className="mb-4 text-sm text-rose-600">{eroare}</p>}
 
         {canManageCalendar && (
@@ -406,7 +381,6 @@ export default function CalendarView({ angajat, canManageCalendar, onBack, onSig
         <ListeEvenimente tipuri={tipuri} statusuri={statusuri} evenimente={evenimente} onClose={() => setShowListe(false)} onChanged={load} />
       )}
 
-      <SiteFooter />
     </div>
   )
 }

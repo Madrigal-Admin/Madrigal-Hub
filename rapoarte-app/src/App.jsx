@@ -1,4 +1,4 @@
-import { ArrowLeft } from 'lucide-react'
+import { Home } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
 import Navbar from './components/Navbar'
@@ -80,8 +80,8 @@ function AppIntern() {
         <Navbar displayName={displayName} roleLabel={null} onLogout={handleLogout} />
         <main className="flex flex-1 flex-col items-center justify-center px-4">
           <a href="/" className="hub-back mb-4">
-            <ArrowLeft size={15} />
-            Înapoi la Hub
+            <Home size={15} />
+            Acasă
           </a>
           <div className="mx-auto max-w-md rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-800">
             Contul tău nu are acces la tool-ul Rapoarte. Contactează un administrator din Hub, în secțiunea
@@ -101,8 +101,8 @@ function AppIntern() {
 
         <main className="min-w-0 flex-1 p-6 md:p-8">
           <a href="/" className="hub-back mb-4">
-            <ArrowLeft size={15} />
-            Înapoi la Hub
+            <Home size={15} />
+            Acasă
           </a>
 
           <div className="w-full">

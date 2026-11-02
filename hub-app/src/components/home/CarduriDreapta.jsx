@@ -2,7 +2,7 @@ import { luna, zi } from './date'
 
 const carcasa = 'rounded-[14px] border border-[#E1E4EA] bg-white px-5 py-[18px]'
 
-export function EvenimenteleMele({ evenimente, progres, statusuri }) {
+export function EvenimenteleMele({ evenimente, progres, statusuri, onStart, onToate }) {
   if (evenimente.length === 0) return null
   return (
     <section aria-label="Evenimentele mele" className={carcasa}>
@@ -33,12 +33,13 @@ export function EvenimenteleMele({ evenimente, progres, statusuri }) {
                 </div>
               ) : (
                 <div className="mt-3">
-                  <a
-                    href={`/taskuri/?tab=evenimente&start=${e.id}`}
+                  <button
+                    type="button"
+                    onClick={() => onStart(e)}
                     className="flex min-h-[44px] w-full items-center justify-center rounded-[10px] bg-accent text-sm font-bold text-white hover:bg-accent-hover"
                   >
                     Trece în „În organizare”
-                  </a>
+                  </button>
                   <div className="mt-1.5 text-xs text-[#5B6578]">Vei alege din checklist taskurile necesare.</div>
                 </div>
               )}
@@ -46,12 +47,12 @@ export function EvenimenteleMele({ evenimente, progres, statusuri }) {
           )
         })}
       </div>
-      <a href="/taskuri/?tab=evenimente" className="mt-2 inline-block py-3 text-sm font-bold text-accent hover:underline">Vezi toate evenimentele mele →</a>
+      <button type="button" onClick={onToate} className="mt-2 inline-block py-3 text-sm font-bold text-accent hover:underline">Vezi toate evenimentele mele →</button>
     </section>
   )
 }
 
-export function TicheteDepartament({ departamente }) {
+export function TicheteDepartament({ departamente, onToate }) {
   if (departamente.length === 0) return null
   return (
     <section aria-label="Tichete departament" className={carcasa}>
@@ -80,7 +81,7 @@ export function TicheteDepartament({ departamente }) {
           </div>
         )
       })}
-      <a href="/taskuri/?tab=departament" className="mt-3.5 inline-block py-3 text-sm font-bold text-accent hover:underline">Vezi taskurile departamentului →</a>
+      <button type="button" onClick={onToate} className="mt-3.5 inline-block py-3 text-sm font-bold text-accent hover:underline">Vezi taskurile departamentului →</button>
     </section>
   )
 }

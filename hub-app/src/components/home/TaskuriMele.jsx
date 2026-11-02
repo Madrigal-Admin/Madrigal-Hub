@@ -29,13 +29,12 @@ function Rand({ t, g, ctx }) {
   const terminat = t.status === 'terminat'
   const p = PRIORITATE[t.prioritate]
   const de = t.creat_de && t.creat_de !== ctx.me.id ? prenume(ctx.nume[t.creat_de]) : null
-  const link = `/taskuri/?task=${t.id}`
   return (
     <div className="border-t border-[#EEF0F4] px-4 py-3 sm:px-5 sm:py-3.5">
       {/* telefon: card compact */}
       <div className="sm:hidden">
         <div className="flex items-start justify-between gap-3">
-          <a href={link} className={`text-[15px] font-bold leading-snug ${terminat ? 'text-[#7A869A] line-through' : 'text-[#172036]'}`}>{t.titlu}</a>
+          <button type="button" onClick={() => ctx.onDeschide(t)} className={`text-left text-[15px] font-bold leading-snug ${terminat ? 'text-[#7A869A] line-through' : 'text-[#172036]'}`}>{t.titlu}</button>
           <span className={`shrink-0 text-[13px] font-bold ${g === 'Întârziate' ? 'text-[#B4332E]' : 'text-[#172036]'}`}>{textTermen(t, g)}</span>
         </div>
         <div className="mt-2 flex items-center justify-between gap-2">
@@ -52,7 +51,7 @@ function Rand({ t, g, ctx }) {
           {s.nume}
         </button>
         <div className="min-w-0 flex-1">
-          <a href={link} className={`block text-[15px] font-semibold leading-snug hover:underline ${terminat ? 'text-[#7A869A] line-through' : 'text-[#172036]'}`}>{t.titlu}</a>
+          <button type="button" onClick={() => ctx.onDeschide(t)} className={`block text-left text-[15px] font-semibold leading-snug hover:underline ${terminat ? 'text-[#7A869A] line-through' : 'text-[#172036]'}`}>{t.titlu}</button>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[13px] text-[#5B6578]">
             <Eticheta t={t} evenimente={ctx.evenimente} />
             {de && <span>de la {de}</span>}

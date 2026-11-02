@@ -1,61 +1,78 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { LogOut, Plus } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { Plus, Settings } from 'lucide-react'
 import { supabase } from '../supabaseClient'
-import SiteHeader from './SiteHeader'
-import SiteFooter from './SiteFooter'
-import GhidRouter from './ghid/GhidRouter'
-import { BaraJos, RandTooluri, construiesteTooluri } from './home/NavigareTooluri'
 import TaskuriMele from './home/TaskuriMele'
 import { EvenimenteleMele, TicheteDepartament, UrmatoareleEvenimente } from './home/CarduriDreapta'
-import { azi, dataAzi, esteDeschis, grupa, incarcaHome, prenume } from './home/date'
+import { azi, dataAzi, esteDeschis, grupa, prenume } from './home/date'
+import { useTaskuri } from './taskuri/TaskuriContext'
 
 const URMATORUL = { de_facut: 'in_lucru', in_lucru: 'terminat', terminat: 'de_facut' }
 
-// Homepage-ul Hub-ului, orientat pe taskuri. Tool-urile rămân la un click, în rândul „Tool-uri".
-export default function Dashboard({ angajat, accesTooluri, isHubAdmin, onOpenAdmin, onOpenCalendar, canSeeStatistici, onOpenStatistici, onSignOut }) {
-  const accesSet = useMemo(() => new Set(accesTooluri.map((a) => a.tool)), [accesTooluri])
-  const rolTaskuri = accesTooluri.find((a) => a.tool === 'taskuri')?.rol || null
-  const areTaskuri = !!rolTaskuri
-
-  const [date, setDate] = useState(null)
-  const [taskuri, setTaskuri] = useState([])
+// Homepage orientat pe taskuri. Task nou / detaliu task / checklist se deschid ca ferestre deasupra paginii.
+export default function Dashboard({ angajat, onNavigate, onOpenCalendar }) {
+  const { ctx, acte, eroare: eroareIncarcare, areTaskuri } = useTaskuri()
   const [filtru, setFiltru] = useState('Toate')
+  const [suprascrieri, setSuprascrieri] = useState({}) // id -> status afișat imediat, până se confirmă
   const [eroare, setEroare] = useState('')
 
-  const incarca = useCallback(async () => {
-    const r = await incarcaHome(angajat, areTaskuri)
-    setDate(r)
-    setTaskuri(r.taskuri)
-    setEroare(r.eroare)
-  }, [angajat, areTaskuri])
-  useEffect(() => { incarca() }, [incarca])
+  const sapteZile = Date.now() - 7 * 24 * 3600 * 1000
+  const taskuri = useMemo(() => {
+    if (!ctx) return []
+    return ctx.taskuri
+      .filter((t) => t.responsabil_id === angajat.id || (ctx.colabDupaTask[t.id] || []).includes(angajat.id))
+      .filter((t) => esteDeschis(t) || (t.status === 'terminat' && t.terminat_la && new Date(t.terminat_la).getTime() >= sapteZile))
+      .map((t) => (suprascrieri[t.id] ? { ...t, status: suprascrieri[t.id] } : t))
+  }, [ctx, angajat.id, suprascrieri]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Schimbă statusul la click (De făcut → În lucru → Terminat). Se vede imediat; dacă baza de date refuză, revine.
+  // Status la click: De făcut → În lucru → Terminat. Se vede imediat; dacă baza de date refuză, revine.
   async function cicleaza(t) {
     const nou = URMATORUL[t.status]
-    const vechi = taskuri
     setEroare('')
-    setTaskuri((lista) => lista.map((x) => (x.id === t.id ? { ...x, status: nou, terminat_la: nou === 'terminat' ? new Date().toISOString() : null } : x)))
+    setSuprascrieri((s) => ({ ...s, [t.id]: nou }))
     const { error } = await supabase.rpc('tsk_schimba_status', { p_task: t.id, p_status: nou })
-    if (error) {
-      setTaskuri(vechi)
-      setEroare(error.code === 'P0001' ? error.message : 'Nu am putut schimba statusul.')
-    }
+    if (error) setEroare(error.code === 'P0001' ? error.message : 'Nu am putut schimba statusul.')
+    await ctx.reload()
+    setSuprascrieri((s) => {
+      const n = { ...s }
+      delete n[t.id]
+      return n
+    })
   }
 
-  const tooluri = construiesteTooluri({ accesSet, canSeeStatistici, isHubAdmin, onOpenCalendar, onOpenStatistici, onOpenAdmin })
+  const evenimente = ctx?.evenimente || []
+  const evMap = ctx?.evMap || {}
+  const evenimenteleMele = (ctx?.evenimenteMele || []).filter((e) => ['deschis', 'organizare'].includes(ctx.comportament(e.id)))
+  const progres = useMemo(() => {
+    const p = {}
+    for (const t of ctx?.taskuri || []) {
+      if (!t.eveniment_id || t.status === 'anulat') continue
+      const x = (p[t.eveniment_id] ||= { total: 0, gata: 0 })
+      x.total++
+      if (t.status === 'terminat') x.gata++
+    }
+    return p
+  }, [ctx])
 
-  const evenimente = date?.evenimente || []
-  const statusuri = date?.statusuri || []
-  const eviMap = Object.fromEntries(evenimente.map((e) => [e.id, e]))
-  const evenimenteleMele = evenimente.filter((e) => e.pm.includes(angajat.id) && ['deschis', 'organizare'].includes(e.comportament))
-  const urmatoare = evenimente
-    .filter((e) => e.comportament !== 'anulat' && (e.data_sfarsit || e.data) >= azi())
-    .slice(0, 4)
+  const departamente = useMemo(() => {
+    if (!ctx) return []
+    const numara = {}
+    for (const t of ctx.taskuri) if (esteDeschis(t) && t.responsabil_id) numara[t.responsabil_id] = (numara[t.responsabil_id] || 0) + 1
+    return ctx.grupuri
+      .filter((g) => g.activ && ctx.grupuriCoordonate.has(g.id))
+      .map((g) => ({
+        id: g.id,
+        nume: g.nume,
+        membri: ctx.membri
+          .filter((m) => m.grup_id === g.id)
+          .map((m) => ({ id: m.angajat_id, nume: ctx.nume(m.angajat_id), nr: numara[m.angajat_id] || 0 }))
+          .sort((a, b) => b.nr - a.nr),
+      }))
+  }, [ctx])
 
-  // Cine are voie să creeze taskuri: admin taskuri, PM la un eveniment activ sau coordonator de departament.
-  const poateCrea =
-    areTaskuri && (rolTaskuri === 'admin' || evenimente.some((e) => e.pm.includes(angajat.id) && e.comportament !== 'anulat') || (date?.departamente.length || 0) > 0)
+  const urmatoare = evenimente.filter((e) => ctx.comportament(e.id) !== 'anulat' && (e.data_sfarsit || e.data) >= azi()).slice(0, 4)
+
+  const poateCrea = !!ctx && (ctx.poateEveniment || ctx.poateOperational)
+  const esteAdminTaskuri = !!ctx?.admin
 
   const deschise = taskuri.filter(esteDeschis)
   const nrIntarziate = deschise.filter((t) => grupa(t) === 'Întârziate').length
@@ -75,80 +92,73 @@ export default function Dashboard({ angajat, accesTooluri, isHubAdmin, onOpenAdm
   ]
 
   const butonTaskNou = (clase) => (
-    <a href="/taskuri/?nou=1" className={clase}>
+    <button type="button" onClick={() => acte.taskNou()} className={clase}>
       <Plus size={18} strokeWidth={2.5} aria-hidden="true" /> Task nou
-    </a>
+    </button>
   )
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#F6F8FB] text-[#172036]">
-      <SiteHeader
-        title="Hub Madrigal"
-        right={
-          <div className="flex items-center gap-2">
-            <span className="hidden max-w-[220px] truncate rounded-full bg-[#EEF1F6] px-3.5 py-2 text-[13px] font-semibold text-[#3A465C] sm:inline-block">{angajat.nume_complet}</span>
-            <button onClick={onSignOut} aria-label="Deconectare" title="Deconectare" className="flex h-11 w-11 items-center justify-center rounded-[10px] text-[#3A465C] hover:bg-slate-100 focus-ring">
-              <LogOut size={20} />
-            </button>
-          </div>
-        }
-      />
-      <RandTooluri tooluri={tooluri} />
-
-      <main className="flex w-full flex-1 flex-col gap-6 px-4 pb-28 pt-6 sm:px-8 sm:pb-14 sm:pt-7">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-extrabold tracking-tight sm:text-[30px]">Bună, {prenume(angajat.nume_complet)}</h1>
-            <p className="mt-1.5 text-sm text-[#5B6578] sm:text-[15px]">{dataAzi()} · {rezumat}</p>
-          </div>
-          {poateCrea && butonTaskNou('hidden min-h-[44px] items-center gap-2 rounded-[10px] bg-accent px-[18px] text-[15px] font-bold text-white no-underline hover:bg-accent-hover sm:inline-flex')}
+    <main className="flex w-full flex-1 flex-col gap-6 px-4 pb-10 pt-6 sm:px-8 sm:pb-14 sm:pt-7">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-extrabold tracking-tight sm:text-[30px]">Bună, {prenume(angajat.nume_complet)}</h1>
+          <p className="mt-1.5 text-sm text-[#5B6578] sm:text-[15px]">{dataAzi()} · {rezumat}</p>
         </div>
+        <div className="hidden items-center gap-3 sm:flex">
+          {esteAdminTaskuri && (
+            <button type="button" onClick={() => onNavigate('setari')} className="inline-flex min-h-[44px] items-center gap-2 rounded-[10px] bg-[#FDE8D2] px-[18px] text-[15px] font-bold text-[#8A4B12] hover:bg-[#FBDDBF]">
+              <Settings size={18} aria-hidden="true" /> Setări
+            </button>
+          )}
+          {poateCrea && butonTaskNou('inline-flex min-h-[44px] items-center gap-2 rounded-[10px] bg-accent px-[18px] text-[15px] font-bold text-white hover:bg-accent-hover')}
+        </div>
+      </div>
 
-        {eroare && <p className="text-sm text-rose-600">{eroare}</p>}
+      {(eroare || eroareIncarcare) && <p className="text-sm text-rose-600">{eroare || eroareIncarcare}</p>}
 
-        {!areTaskuri ? (
-          <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
-            <div className="rounded-[14px] border border-[#E1E4EA] bg-white p-6 text-sm text-[#5B6578]">
-              Nu ai încă acces la Taskuri. Dacă ai nevoie, cere unui administrator să-ți dea acces din Hub, la „Acces Tool-uri”. Tool-urile la care ai acces sunt în rândul de sus.
-            </div>
-            <UrmatoareleEvenimente evenimente={urmatoare} onOpenCalendar={onOpenCalendar} />
+      {!areTaskuri ? (
+        <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
+          <div className="rounded-[14px] border border-[#E1E4EA] bg-white p-6 text-sm text-[#5B6578]">
+            Nu ai încă acces la Taskuri. Dacă ai nevoie, cere unui administrator să-ți dea acces din Hub, la „Acces Tool-uri”. Tool-urile la care ai acces sunt în rândul de sus.
           </div>
-        ) : (
-          <>
-            <div className="flex flex-wrap gap-3 sm:gap-4">
-              {casete.map(([eticheta, n, cap, culoare, ascunde]) => (
-                <div key={eticheta} className={`min-w-[96px] flex-1 rounded-[14px] border border-[#E1E4EA] bg-white px-3.5 py-3 sm:min-w-[200px] sm:px-5 sm:py-[18px] ${ascunde}`}>
-                  <div className="text-xs font-semibold text-[#5B6578] sm:text-[13px]">{eticheta}</div>
-                  <div className={`my-1 text-[26px] font-extrabold leading-tight tracking-tight sm:text-[34px] ${culoare}`}>{date ? n : '–'}</div>
-                  <div className="hidden text-[13px] text-[#5B6578] sm:block">{cap}</div>
-                </div>
-              ))}
-            </div>
-
-            <div className="flex flex-wrap items-start gap-6">
-              <div className="min-w-0 flex-[999_1_560px]">
-                {date ? (
-                  <TaskuriMele taskuri={taskuri} filtru={filtru} setFiltru={setFiltru} ctx={{ me: angajat, nume: date.nume, evenimente: eviMap, onCicleaza: cicleaza }} />
-                ) : (
-                  <p className="text-sm text-[#5B6578]">Se încarcă taskurile…</p>
-                )}
+          {ctx && <UrmatoareleEvenimente evenimente={urmatoare} onOpenCalendar={onOpenCalendar} />}
+        </div>
+      ) : (
+        <>
+          <div className="flex flex-wrap gap-3 sm:gap-4">
+            {casete.map(([eticheta, n, cap, culoare, ascunde]) => (
+              <div key={eticheta} className={`min-w-[96px] flex-1 rounded-[14px] border border-[#E1E4EA] bg-white px-3.5 py-3 sm:min-w-[200px] sm:px-5 sm:py-[18px] ${ascunde}`}>
+                <div className="text-xs font-semibold text-[#5B6578] sm:text-[13px]">{eticheta}</div>
+                <div className={`my-1 text-[26px] font-extrabold leading-tight tracking-tight sm:text-[34px] ${culoare}`}>{ctx ? n : '–'}</div>
+                <div className="hidden text-[13px] text-[#5B6578] sm:block">{cap}</div>
               </div>
-              <aside className="flex min-w-0 flex-[1_1_340px] flex-col gap-6">
-                <EvenimenteleMele evenimente={evenimenteleMele} progres={date?.progres || {}} statusuri={statusuri} />
-                <TicheteDepartament departamente={date?.departamente || []} />
-                <UrmatoareleEvenimente evenimente={urmatoare} onOpenCalendar={onOpenCalendar} />
-              </aside>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap items-start gap-6">
+            <div className="min-w-0 flex-[999_1_560px]">
+              {ctx ? (
+                <TaskuriMele
+                  taskuri={taskuri}
+                  filtru={filtru}
+                  setFiltru={setFiltru}
+                  ctx={{ me: angajat, nume: Object.fromEntries(ctx.angajati.map((a) => [a.id, a.nume_complet])), evenimente: evMap, onCicleaza: cicleaza, onDeschide: (t) => acte.deschideTask(t.id) }}
+                />
+              ) : (
+                <p className="text-sm text-[#5B6578]">Se încarcă taskurile…</p>
+              )}
             </div>
-          </>
-        )}
-      </main>
+            <aside className="flex min-w-0 flex-[1_1_340px] flex-col gap-6">
+              <EvenimenteleMele evenimente={evenimenteleMele} progres={progres} statusuri={ctx?.statusuri || []} onStart={(e) => acte.checklist('start', e)} onToate={() => onNavigate('evenimente')} />
+              <TicheteDepartament departamente={departamente} onToate={() => onNavigate('departament')} />
+              {ctx && <UrmatoareleEvenimente evenimente={urmatoare} onOpenCalendar={onOpenCalendar} />}
+            </aside>
+          </div>
+        </>
+      )}
 
       {poateCrea &&
-        butonTaskNou('fixed bottom-[84px] right-4 z-20 inline-flex min-h-[52px] items-center gap-2 rounded-[26px] bg-accent px-5 text-[15px] font-bold text-white no-underline shadow-[0_4px_14px_rgba(23,32,54,0.3)] sm:hidden')}
-
-      <div className="hidden sm:block"><SiteFooter /></div>
-      <BaraJos tooluri={tooluri} areTaskuri={areTaskuri} onOpenCalendar={onOpenCalendar} />
-      <GhidRouter />
-    </div>
+        butonTaskNou('fixed bottom-[84px] right-4 z-20 inline-flex min-h-[52px] items-center gap-2 rounded-[26px] bg-accent px-5 text-[15px] font-bold text-white shadow-[0_4px_14px_rgba(23,32,54,0.3)] sm:hidden')}
+    </main>
   )
 }
