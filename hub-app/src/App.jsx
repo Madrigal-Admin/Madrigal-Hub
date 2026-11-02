@@ -5,7 +5,7 @@ import Dashboard from './components/Dashboard'
 import AdminLayout from './components/AdminLayout'
 import CalendarView from './components/CalendarView'
 import Shell from './components/Shell'
-import { construiesteTooluri } from './components/home/NavigareTooluri'
+import { construiesteTooluri } from '@shared/tooluri'
 import { TaskuriProvider } from './components/taskuri/TaskuriContext'
 import { PaginaDepartament, PaginaEvenimente, PaginaSetari } from './components/taskuri/Pagini'
 
@@ -130,7 +130,6 @@ export default function App() {
   const canManageCalendar = isHubAdmin || accesTooluri.some((a) => a.tool === 'calendar' && a.rol === 'admin')
   const canSeeStatistici = canManageCalendar || accesTooluri.some((a) => a.tool === 'calendar' && a.rol === 'statistici')
   const rolTaskuri = accesTooluri.find((a) => a.tool === 'taskuri')?.rol || null
-  const accesSet = new Set(accesTooluri.map((a) => a.tool))
 
   // Doar paginile la care ai voie; orice altceva te duce acasă.
   const permise = {
@@ -143,12 +142,7 @@ export default function App() {
   }
   const viewEfectiv = permise[view] ? view : 'dashboard'
 
-  const tooluri = construiesteTooluri({
-    accesSet,
-    isHubAdmin,
-    onOpenCalendar: () => navigateTo('calendar'),
-    onOpenAdmin: () => navigateTo('admin'),
-  })
+  const tooluri = construiesteTooluri(accesTooluri)
 
   return (
     <TaskuriProvider angajat={angajat} accesTooluri={accesTooluri}>

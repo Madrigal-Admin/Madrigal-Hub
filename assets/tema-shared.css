@@ -65,36 +65,6 @@ textarea {
   gap: 0.75rem;
 }
 
-/* Butonul „Hub" din antet — același în toate tool-urile, mereu în stânga */
-.hub-back {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0.4rem 0.9rem;
-  border-radius: 9999px;
-  background: var(--madrigal-accent);
-  color: #ffffff;
-  font-size: 0.875rem;
-  font-weight: 600;
-  line-height: 1;
-  text-decoration: none;
-  border: 0;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background 0.15s;
-}
-.hub-back:hover {
-  background: var(--madrigal-accent-hover);
-}
-.hub-back:focus-visible {
-  outline: 2px solid var(--madrigal-accent);
-  outline-offset: 2px;
-}
-.hub-back svg {
-  width: 15px;
-  height: 15px;
-}
-
 .site-header__logo {
   height: 36px;
   width: auto;

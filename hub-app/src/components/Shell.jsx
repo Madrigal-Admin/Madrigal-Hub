@@ -1,29 +1,17 @@
-import { LogOut } from 'lucide-react'
-import SiteHeader from './SiteHeader'
+import HubHeader from '@shared/HubHeader'
 import SiteFooter from './SiteFooter'
-import GhidRouter from './ghid/GhidRouter'
-import { BaraJos, RandTooluri } from './home/NavigareTooluri'
+import GhidRouter, { deschideGhid } from './ghid/GhidRouter'
 
-// Cadrul comun al tuturor paginilor din Hub: antetul și rândul de tool-uri rămân pe loc,
+// Cadrul comun al paginilor din Hub: antetul (același ca în toate tool-urile) rămâne pe loc,
 // iar doar conținutul de dedesubt se schimbă.
 export default function Shell({ angajat, tooluri, view, onNavigate, onSignOut, children }) {
+  // „Acasă" e pagina de start; celelalte pagini din Hub (calendar, administrare) au câte un buton în listă.
+  const activ = view === 'dashboard' || !tooluri.some((t) => t.view === view) ? 'acasa' : tooluri.find((t) => t.view === view).key
   return (
     <div className="flex min-h-screen flex-col bg-[#F6F8FB] text-[#172036]">
-      <SiteHeader
-        title="Hub Madrigal"
-        right={
-          <div className="flex items-center gap-2">
-            <span className="hidden max-w-[220px] truncate rounded-full bg-[#EEF1F6] px-3.5 py-2 text-[13px] font-semibold text-[#3A465C] sm:inline-block">{angajat.nume_complet}</span>
-            <button onClick={onSignOut} aria-label="Deconectare" title="Deconectare" className="flex h-11 w-11 items-center justify-center rounded-[10px] text-[#3A465C] hover:bg-slate-100 focus-ring">
-              <LogOut size={20} />
-            </button>
-          </div>
-        }
-      />
-      <RandTooluri tooluri={tooluri} view={view} onNavigate={onNavigate} />
-      <div className="flex flex-1 flex-col pb-20 sm:pb-0">{children}</div>
+      <HubHeader nume={angajat.nume_complet} tooluri={tooluri} activ={activ} onNavigate={onNavigate} onGhid={deschideGhid} onSignOut={onSignOut} />
+      <div className="flex flex-1 flex-col">{children}</div>
       <div className="hidden sm:block"><SiteFooter /></div>
-      <BaraJos tooluri={tooluri} view={view} onNavigate={onNavigate} />
       <GhidRouter />
     </div>
   )
