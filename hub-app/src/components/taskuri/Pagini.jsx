@@ -5,6 +5,9 @@ import TaskLista from './TaskLista'
 import GrupuriAdmin from './GrupuriAdmin'
 import ChecklistAdmin from './ChecklistAdmin'
 import DashboardEchipa from './DashboardEchipa'
+import DashboardEvenimente from './DashboardTaskuri'
+import SelectorEvenimente from './SelectorEvenimente'
+import { Gol } from './Mici'
 import { Plus } from 'lucide-react'
 
 const Cadru = ({ titlu, descriere, actiune, children }) => (
@@ -24,10 +27,43 @@ const Incarca = () => <p className="px-8 py-6 text-sm text-slate-500">Se încarc
 
 export function PaginaEvenimente() {
   const { ctx, acte } = useTaskuri()
+  const [tab, setTab] = useState('dashboard')
+  const [selectate, setSelectate] = useState(() => new Set()) // gol = toate
   if (!ctx) return <Incarca />
+
+  // Doar evenimentele la care sunt PM (secțiune operativă), cele mai apropiate ca dată primele.
+  const mele = [...ctx.evenimenteMele].sort((a, b) => (a.data || '').localeCompare(b.data || ''))
+  const alese = mele.filter((e) => selectate.has(e.id))
+  const filtrat = selectate.size > 0 && alese.length > 0
+  const pentruLista = filtrat ? alese : mele
+  const pentruDashboard = filtrat ? alese : mele.filter((e) => ['deschis', 'organizare'].includes(ctx.comportament(e.id)))
+  const idsDashboard = new Set(pentruDashboard.map((e) => e.id))
+  const taskuriDashboard = ctx.taskuri.filter((t) => idsDashboard.has(t.eveniment_id))
+
+  const taburi = [['dashboard', 'Dashboard'], ['lista', `Evenimentele mele · ${pentruLista.length}`]]
   return (
-    <Cadru titlu={ctx.admin ? 'Evenimente' : 'Evenimentele mele'} descriere="Progresul fiecărui eveniment, checklistul și taskurile lui.">
-      <Evenimente ctx={ctx} onOpen={(t) => acte.deschideTask(t.id)} onTaskNou={(evId) => acte.taskNou(evId)} onChecklist={(mod, e) => acte.checklist(mod, e)} />
+    <Cadru titlu="Evenimentele mele" descriere="Evenimentele la care ești PM: progresul, checklistul și taskurile lor.">
+      {mele.length === 0 ? (
+        <Gol>Nu ești PM la niciun eveniment.</Gol>
+      ) : (
+        <>
+          <div role="tablist" aria-label="Evenimentele mele" className="mb-5 flex gap-1 border-b border-[#E1E4EA]">
+            {taburi.map(([k, l]) => (
+              <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={`-mb-px min-h-[44px] border-b-[3px] px-5 text-[15px] font-extrabold ${tab === k ? 'border-accent text-accent' : 'border-transparent text-[#5B6578] hover:text-[#172036]'}`}>
+                {l}
+              </button>
+            ))}
+          </div>
+          <div className="mb-5">
+            <SelectorEvenimente evenimente={mele} selectate={selectate} onChange={setSelectate} />
+          </div>
+          {tab === 'dashboard' ? (
+            <DashboardEvenimente taskuri={taskuriDashboard} ctx={ctx} />
+          ) : (
+            <Evenimente ctx={ctx} evenimente={pentruLista} onOpen={(t) => acte.deschideTask(t.id)} onTaskNou={(evId) => acte.taskNou(evId)} onChecklist={(mod, e) => acte.checklist(mod, e)} />
+          )}
+        </>
+      )}
     </Cadru>
   )
 }

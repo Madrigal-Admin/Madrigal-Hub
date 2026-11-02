@@ -38,7 +38,10 @@ export default function Dashboard({ angajat, onNavigate, onOpenCalendar }) {
 
   const evenimente = ctx?.evenimente || []
   const evMap = ctx?.evMap || {}
-  const evenimenteleMele = (ctx?.evenimenteMele || []).filter((e) => ['deschis', 'organizare'].includes(ctx.comportament(e.id)))
+  const evenimenteleMele = (ctx?.evenimenteMele || [])
+    .map((e) => ({ ...e, comportament: ctx.comportament(e.id) }))
+    .filter((e) => ['deschis', 'organizare'].includes(e.comportament))
+    .sort((a, b) => (a.data || '').localeCompare(b.data || ''))
   const progres = useMemo(() => {
     const p = {}
     for (const t of ctx?.taskuri || []) {

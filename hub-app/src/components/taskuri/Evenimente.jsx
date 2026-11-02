@@ -4,33 +4,33 @@ import { supabase } from '../../supabaseClient'
 import { estePrelucrat, formatData, mesajEroare, esteIntarziat } from '../../lib/taskuri/ui'
 import { culoareText } from '../../lib/evenimente'
 import { Gol } from './Mici'
-import TaskLista from './TaskLista'
-import DashboardEvenimente from './DashboardTaskuri'
-import SelectorEvenimente from './SelectorEvenimente'
+import TabelTaskuri from './TabelTaskuri'
 
-// „Evenimentele mele": progresul fiecărui eveniment la care ești PM (adminul le vede pe toate).
-export default function Evenimente({ ctx, onOpen, onTaskNou, onChecklist }) {
-  const [toate, setToate] = useState(false)
-  const [deschise, setDeschise] = useState(() => new Set())
+const SECTIUNI = [
+  { cod: 'deschis', titlu: 'Deschise', nota: 'Organizarea nu a început — taskurile apar după ce treci în „În organizare”' },
+  { cod: 'organizare', titlu: 'În organizare', nota: '' },
+  { cod: 'inchise', titlu: 'Finalizate și anulate', nota: 'ascunse implicit' },
+]
+
+// Lista „Evenimentele mele": evenimentele tale grupate pe status, fiecare cu taskurile lui dedesubt.
+export default function Evenimente({ ctx, evenimente, onOpen, onTaskNou, onChecklist }) {
+  const [inchise, setInchise] = useState(() => new Set()) // evenimente cu taskurile strânse
+  const [arataInchise, setArataInchise] = useState(false)
   const [eroare, setEroare] = useState('')
-  const [selectate, setSelectate] = useState(() => new Set()) // gol = toate
 
-  const lista = useMemo(() => {
-    const baza = ctx.admin ? ctx.evenimente : ctx.evenimenteMele
-    return baza
-      .filter((e) => toate || ['deschis', 'organizare'].includes(ctx.comportament(e.id)))
-      .sort((a, b) => (a.data || '').localeCompare(b.data || ''))
-  }, [ctx, toate])
-
-  // evenimentele alese în selector (dacă nu e ales niciunul, toate cele din listă)
-  const afisate = useMemo(() => {
-    const alese = lista.filter((e) => selectate.has(e.id))
-    return selectate.size && alese.length ? alese : lista
-  }, [lista, selectate])
-  const taskuriDashboard = useMemo(() => {
-    const ids = new Set(afisate.map((e) => e.id))
-    return ctx.taskuri.filter((t) => ids.has(t.eveniment_id))
-  }, [ctx, afisate])
+  // În grupurile active: cele mai apropiate ca dată primele. La cele încheiate: cele mai recente primele.
+  const grupuri = useMemo(() => {
+    const dupa = (cod) => evenimente.filter((e) => {
+      const c = ctx.comportament(e.id)
+      return cod === 'inchise' ? c === 'finalizat' || c === 'anulat' : c === cod
+    })
+    const crescator = (a, b) => (a.data || '').localeCompare(b.data || '')
+    return {
+      deschis: dupa('deschis').sort(crescator),
+      organizare: dupa('organizare').sort(crescator),
+      inchise: dupa('inchise').sort((a, b) => crescator(b, a)),
+    }
+  }, [ctx, evenimente])
 
   async function status(e, cod) {
     setEroare('')
@@ -41,110 +41,103 @@ export default function Evenimente({ ctx, onOpen, onTaskNou, onChecklist }) {
 
   const codOrganizare = ctx.statusuri.find((s) => s.comportament === 'organizare')?.cod
   const codFinalizat = ctx.statusuri.find((s) => s.comportament === 'finalizat')?.cod
+  const comuta = (id) => setInchise((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
+
+  const renderCard = (e) => {
+    const st = ctx.statusMap[e.status]
+    const comp = st?.comportament
+    const taskuri = ctx.taskuri.filter((t) => t.eveniment_id === e.id)
+    const valide = taskuri.filter((t) => t.status !== 'anulat')
+    const gata = valide.filter((t) => t.status === 'terminat').length
+    const deschiseNr = taskuri.filter(estePrelucrat).length
+    const intarziate = taskuri.filter(esteIntarziat).length
+    const procent = valide.length ? Math.round((gata / valide.length) * 100) : 0
+    const strans = inchise.has(e.id)
+    const poate = ctx.pmLaEveniment(e.id)
+    const btn = 'inline-flex min-h-[34px] items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-[13px] font-bold text-slate-700 hover:bg-slate-50'
+    return (
+      <div key={e.id} className="mb-3 overflow-hidden rounded-[14px] border border-[#E1E4EA] bg-white">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 sm:px-5">
+          <button type="button" onClick={() => comuta(e.id)} aria-expanded={!strans} className="flex min-w-[220px] flex-1 items-center gap-2 text-left">
+            {strans ? <ChevronRight size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
+            <span>
+              <span className="block text-base font-extrabold text-[#172036]">{e.nume}</span>
+              <span className="block text-[13px] text-[#5B6578]">{formatData(e.data)}{e.localitate ? ` · ${e.localitate}` : ''}</span>
+            </span>
+          </button>
+          <span className="rounded-full px-3 py-1 text-xs font-bold" style={{ backgroundColor: `${st?.culoare}26`, color: culoareText(st?.culoare) }}>{st?.nume || e.status}</span>
+          {valide.length > 0 && (
+            <div className="w-48">
+              <div className="h-2 rounded-full bg-[#E9EDF3]"><div className="h-2 rounded-full bg-[#2E9E6B]" style={{ width: `${procent}%` }} /></div>
+              <p className="mt-1 text-xs text-[#5B6578]">{gata}/{valide.length} terminate{intarziate > 0 && <span className="font-bold text-[#B4332E]"> · {intarziate} întârziate</span>}</p>
+            </div>
+          )}
+        </div>
+
+        {poate && comp !== 'anulat' && (
+          <div className="flex flex-wrap gap-2 px-4 pb-3 sm:pl-[46px] sm:pr-5">
+            {comp === 'deschis' && (
+              <button type="button" onClick={() => onChecklist('start', e)} className="inline-flex min-h-[34px] items-center gap-1.5 rounded-lg bg-accent px-3 text-[13px] font-bold text-white hover:bg-accent-hover">
+                <PlayCircle size={14} /> Trece în „În organizare”
+              </button>
+            )}
+            <button type="button" onClick={() => onTaskNou(e.id)} className={btn}><Plus size={14} /> Task nou</button>
+            {comp === 'organizare' && <button type="button" onClick={() => onChecklist('adauga', e)} className={btn}><ListChecks size={14} /> Adaugă din checklist</button>}
+            {comp === 'organizare' && codFinalizat && (
+              <button type="button" onClick={() => status(e, codFinalizat)} title={deschiseNr > 0 ? `Mai ai ${deschiseNr} taskuri deschise` : 'Marchează evenimentul ca finalizat'} className="inline-flex min-h-[34px] items-center gap-1.5 rounded-lg border border-emerald-200 bg-white px-3 text-[13px] font-bold text-emerald-700 hover:bg-emerald-50">
+                <CheckCircle2 size={14} /> Marchează finalizat
+              </button>
+            )}
+            {comp === 'finalizat' && codOrganizare && (
+              <button type="button" onClick={() => status(e, codOrganizare)} className={btn}><RotateCcw size={14} /> Redeschide în organizare</button>
+            )}
+          </div>
+        )}
+        {comp === 'anulat' && <p className="px-5 pb-3 text-xs text-rose-600">Eveniment anulat — taskurile lui sunt înghețate.</p>}
+
+        {!strans && taskuri.length > 0 && <TabelTaskuri taskuri={taskuri} ctx={ctx} onOpen={onOpen} onEroare={setEroare} />}
+        {!strans && taskuri.length === 0 && (
+          <p className="border-t border-[#EEF0F4] px-5 py-3 text-[13px] text-[#5B6578] sm:pl-[46px]">
+            {comp === 'deschis' ? 'Niciun task încă. Vei alege din checklist taskurile necesare când pornești organizarea.' : 'Niciun task la acest eveniment.'}
+          </p>
+        )}
+      </div>
+    )
+  }
+
+  const titluSectiune = (s, nr) => (
+    <div className="mb-2.5 mt-6 flex flex-wrap items-baseline gap-x-3">
+      <h2 className="text-[15px] font-extrabold uppercase tracking-wide text-[#172036]">{s.titlu} · {nr}</h2>
+      {s.nota && <span className="text-[13px] text-[#5B6578]">{s.nota}</span>}
+    </div>
+  )
+
+  if (evenimente.length === 0) return <Gol>Nu ai evenimente pentru selecția aleasă.</Gol>
 
   return (
     <div>
-      <div className="mb-3 flex flex-wrap items-center gap-3">
-        <p className="text-sm text-slate-500">
-          {ctx.admin ? 'Toate evenimentele.' : 'Evenimentele la care ești PM.'}
-        </p>
-        <SelectorEvenimente evenimente={lista} selectate={selectate} onChange={setSelectate} />
-        <label className="ml-auto flex items-center gap-2 text-sm text-slate-600">
-          <input type="checkbox" checked={toate} onChange={(e) => setToate(e.target.checked)} />
-          Arată și evenimentele finalizate / anulate
-        </label>
-      </div>
-      {lista.length > 0 && <DashboardEvenimente taskuri={taskuriDashboard} ctx={ctx} />}
       {eroare && <p className="mb-3 whitespace-pre-wrap text-sm text-rose-600">{eroare}</p>}
-
-      {lista.length === 0 ? (
-        <Gol>{ctx.admin ? 'Nu există evenimente active.' : 'Nu ești PM la niciun eveniment activ.'}</Gol>
-      ) : (
-        <div className="space-y-3">
-          {afisate.map((e) => {
-            const st = ctx.statusMap[e.status]
-            const comp = st?.comportament
-            const taskuri = ctx.taskuri.filter((t) => t.eveniment_id === e.id)
-            const valide = taskuri.filter((t) => t.status !== 'anulat')
-            const gata = valide.filter((t) => t.status === 'terminat').length
-            const deschiseNr = taskuri.filter(estePrelucrat).length
-            const intarziate = taskuri.filter(esteIntarziat).length
-            const procent = valide.length ? Math.round((gata / valide.length) * 100) : 0
-            const desch = deschise.has(e.id)
-            const poate = ctx.admin || ctx.pmLaEveniment(e.id)
-            return (
-              <div key={e.id} className="rounded-xl bg-white shadow-sm">
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
-                  <button
-                    type="button"
-                    onClick={() => setDeschise((p) => { const n = new Set(p); n.has(e.id) ? n.delete(e.id) : n.add(e.id); return n })}
-                    className="flex min-w-[220px] flex-1 items-center gap-2 text-left"
-                  >
-                    {desch ? <ChevronDown size={16} className="text-slate-400" /> : <ChevronRight size={16} className="text-slate-400" />}
-                    <span>
-                      <span className="block text-sm font-semibold text-slate-800">{e.nume}</span>
-                      <span className="block text-xs text-slate-500">
-                        {formatData(e.data)}{e.localitate ? ` · ${e.localitate}` : ''}
-                      </span>
-                    </span>
-                  </button>
-                  <span className="rounded-full px-2.5 py-0.5 text-xs font-medium" style={{ backgroundColor: `${st?.culoare}26`, color: culoareText(st?.culoare) }}>
-                    {st?.nume || e.status}
-                  </span>
-                  <div className="w-40">
-                    <div className="h-2 rounded-full bg-slate-100">
-                      <div className="h-2 rounded-full bg-emerald-500" style={{ width: `${procent}%` }} />
-                    </div>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {gata}/{valide.length} terminate{intarziate > 0 && <span className="font-semibold text-rose-600"> · {intarziate} întârziate</span>}
-                    </p>
-                  </div>
-                </div>
-
-                {poate && comp !== 'anulat' && (
-                  <div className="flex flex-wrap gap-2 border-t border-slate-100 px-4 py-2">
-                    {comp === 'deschis' && (
-                      <button type="button" onClick={() => onChecklist('start', e)} className="inline-flex items-center gap-1.5 rounded-lg bg-accent px-3 py-1.5 text-xs font-medium text-white hover:bg-accent-hover">
-                        <PlayCircle size={14} /> Trece în „În organizare"
-                      </button>
-                    )}
-                    <button type="button" onClick={() => onTaskNou(e.id)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50">
-                      <Plus size={14} /> Task nou
-                    </button>
-                    {comp === 'organizare' && (
-                      <button type="button" onClick={() => onChecklist('adauga', e)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50">
-                        <ListChecks size={14} /> Adaugă din checklist
-                      </button>
-                    )}
-                    {comp === 'organizare' && codFinalizat && (
-                      <button
-                        type="button"
-                        onClick={() => status(e, codFinalizat)}
-                        title={deschiseNr > 0 ? `Mai ai ${deschiseNr} taskuri deschise` : 'Marchează evenimentul ca finalizat'}
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-50"
-                      >
-                        <CheckCircle2 size={14} /> Marchează finalizat
-                      </button>
-                    )}
-                    {comp === 'finalizat' && codOrganizare && (
-                      <button type="button" onClick={() => status(e, codOrganizare)} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50">
-                        <RotateCcw size={14} /> Redeschide în organizare
-                      </button>
-                    )}
-                  </div>
-                )}
-                {comp === 'anulat' && <p className="border-t border-slate-100 px-4 py-2 text-xs text-rose-600">Eveniment anulat — taskurile lui sunt înghețate.</p>}
-
-                {desch && (
-                  <div className="border-t border-slate-100 p-4">
-                    <TaskLista taskuri={taskuri} ctx={ctx} onOpen={onOpen} arataEveniment={false} />
-                  </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
-      )}
+      {SECTIUNI.map((s) => {
+        const lista = grupuri[s.cod]
+        if (lista.length === 0) return null
+        if (s.cod === 'inchise') {
+          return (
+            <div key={s.cod}>
+              {titluSectiune(s, lista.length)}
+              <button type="button" onClick={() => setArataInchise((a) => !a)} aria-expanded={arataInchise} className="mb-3 text-sm font-bold text-accent hover:underline">
+                {arataInchise ? 'Ascunde' : 'Arată'}
+              </button>
+              {arataInchise && lista.map(renderCard)}
+            </div>
+          )
+        }
+        return (
+          <div key={s.cod}>
+            {titluSectiune(s, lista.length)}
+            {lista.map(renderCard)}
+          </div>
+        )
+      })}
     </div>
   )
 }
