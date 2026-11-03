@@ -155,12 +155,12 @@ export default function TabelTaskuri({ taskuri, ctx, onOpen, onEroare, arataEven
           </div>
         </div>
         {/* desktop: rând de tabel */}
-        <div style={stilGrid} className={`${clasaRand} hidden border-t border-[#EEF0F4] px-5 py-1.5 sm:grid ${aleasa ? 'bg-[#EEF3FB]' : 'hover:bg-[#FAFBFD]'}`}>
+        <div style={stilGrid} className={`${clasaRand} hidden border-t border-[#EEF0F4] px-5 py-2 sm:grid ${aleasa ? 'bg-[#EEF3FB]' : 'hover:bg-[#FAFBFD]'}`}>
           <div><input type="checkbox" className="h-4 w-4 accent-[#22406B]" checked={aleasa} onChange={() => comuta(t.id)} aria-label={`Selectează „${t.titlu}"`} /></div>
           <div>{dd}</div>
-          <div className="flex min-w-0 items-center gap-2">
-            <button type="button" onClick={() => onOpen(t)} title={t.titlu} className={`min-w-0 truncate text-left text-sm font-semibold hover:underline ${inchis ? 'text-[#7A869A] line-through' : 'text-[#172036]'}`}>{t.titlu}</button>
-            <Eticheta t={t} ctx={ctx} arataEveniment={arataEveniment} arataTag={!coloane.tag} />
+          <div className="min-w-0">
+            <button type="button" onClick={() => onOpen(t)} title={t.titlu} className={`block max-w-full truncate text-left text-sm font-semibold hover:underline ${inchis ? 'text-[#7A869A] line-through' : 'text-[#172036]'}`}>{t.titlu}</button>
+            <span className="mt-0.5 flex min-w-0 flex-wrap gap-1 empty:hidden"><Eticheta t={t} ctx={ctx} arataEveniment={arataEveniment} arataTag={!coloane.tag} /></span>
           </div>
           {vizibile.map((k) => (
             <div key={k} className="min-w-0 truncate text-[13px] text-[#172036]">

@@ -49,7 +49,7 @@ export default function TaskuriMele({ taskuri, filtru, setFiltru, ctx, onOpen })
 
       {vizibile.length > 0 ? (
         <div className="border-t border-[#E1E4EA]">
-          <TabelTaskuri taskuri={vizibile} ctx={ctx} onOpen={onOpen} onEroare={setEroare} grupare={filtru === 'Terminate' ? null : GRUPARE} />
+          <TabelTaskuri taskuri={vizibile} ctx={ctx} onOpen={onOpen} onEroare={setEroare} arataEveniment grupare={filtru === 'Terminate' ? null : GRUPARE} />
         </div>
       ) : (
         <div className="border-t border-[#EEF0F4] px-5 py-7 text-center text-sm text-[#5B6578]">
