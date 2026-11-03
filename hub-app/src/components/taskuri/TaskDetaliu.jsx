@@ -1,10 +1,37 @@
 import { useEffect, useState } from 'react'
-import { ExternalLink, Pencil, Trash2 } from 'lucide-react'
+import { ExternalLink, Trash2 } from 'lucide-react'
 import { supabase } from '../../supabaseClient'
-import { STATUSURI, esteIntarziat, formatData, formatDataOra, inputCls, mesajEroare } from '../../lib/taskuri/ui'
-import { Modal, Prioritate, StatusBadge } from './Mici'
+import { esteIntarziat, formatData, formatDataOra, inputCls, mesajEroare } from '../../lib/taskuri/ui'
+import { actualizeaza } from '../../lib/taskuri/editare'
+import { Modal } from './Mici'
+import StatusDropdown from './StatusDropdown'
+import CelulaEditabila from './CelulaEditabila'
+import AngajatiPicker from './AngajatiPicker'
 
-export default function TaskDetaliu({ taskId, ctx, onClose, onEdit }) {
+// Descriere: text pe mai multe rânduri, editabil la click, se salvează când ieși din câmp.
+function Descriere({ task, ctx, poate, onEroare }) {
+  const [edit, setEdit] = useState(false)
+  const [text, setText] = useState('')
+  async function salveaza() {
+    setEdit(false)
+    const nou = text.trim()
+    if (nou === (task.descriere || '')) return
+    const err = await actualizeaza(task.id, { descriere: nou || null })
+    if (err) onEroare(err)
+    else await ctx.reload()
+  }
+  if (!poate) return task.descriere ? <span className="whitespace-pre-wrap">{task.descriere}</span> : <span className="text-slate-400">—</span>
+  if (!edit) {
+    return (
+      <button type="button" onClick={() => { setText(task.descriere || ''); setEdit(true) }} title="Click pentru a modifica" className="-mx-1.5 block w-full rounded-md px-1.5 py-0.5 text-left hover:bg-[#EEF1F6]">
+        {task.descriere ? <span className="whitespace-pre-wrap">{task.descriere}</span> : <span className="text-slate-400">Adaugă o descriere…</span>}
+      </button>
+    )
+  }
+  return <textarea autoFocus rows={4} className={inputCls} value={text} onChange={(e) => setText(e.target.value)} onBlur={salveaza} onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setEdit(false) } }} />
+}
+
+export default function TaskDetaliu({ taskId, ctx, onClose }) {
   const task = ctx.taskuri.find((t) => t.id === taskId)
   const [comentarii, setComentarii] = useState([])
   const [text, setText] = useState('')
@@ -35,6 +62,23 @@ export default function TaskDetaliu({ taskId, ctx, onClose, onEdit }) {
     setEroare('')
     const { error } = await supabase.rpc('tsk_schimba_status', { p_task: task.id, p_status: s })
     if (error) setEroare(mesajEroare(error, 'Nu am putut schimba statusul.'))
+    await ctx.reload()
+  }
+
+  // colaboratori: se salvează imediat, adăugând ce lipsește și scoțând ce nu mai e
+  async function seteazaColaboratori(noi) {
+    setEroare('')
+    const vechi = new Set(colab)
+    const deAdaugat = noi.filter((x) => !vechi.has(x))
+    const deScos = colab.filter((x) => !noi.includes(x))
+    if (deAdaugat.length) {
+      const { error } = await supabase.from('tsk_colaboratori').insert(deAdaugat.map((angajat_id) => ({ task_id: task.id, angajat_id })))
+      if (error) return setEroare(mesajEroare(error))
+    }
+    if (deScos.length) {
+      const { error } = await supabase.from('tsk_colaboratori').delete().eq('task_id', task.id).in('angajat_id', deScos)
+      if (error) return setEroare(mesajEroare(error))
+    }
     await ctx.reload()
   }
 
@@ -69,47 +113,44 @@ export default function TaskDetaliu({ taskId, ctx, onClose, onEdit }) {
     </div>
   )
 
+  const camp = (tip) => <CelulaEditabila tip={tip} task={task} ctx={ctx} poate={gestioneaza} onEroare={setEroare} />
+
   return (
-    <Modal titlu={task.titlu} onClose={onClose}>
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        <StatusBadge status={task.status} />
-        <Prioritate valoare={task.prioritate} />
-        {esteIntarziat(task) && <span className="rounded-full bg-rose-100 px-2 py-0.5 text-xs font-medium text-rose-700">Întârziat</span>}
-        {evAnulat && <span className="text-xs text-rose-600">Evenimentul este anulat — taskul e înghețat.</span>}
-      </div>
+    <Modal titlu={<CelulaEditabila tip="titlu" task={task} ctx={ctx} poate={gestioneaza} onEroare={setEroare} />} onClose={onClose}>
+      {(esteIntarziat(task) || evAnulat) && (
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          {esteIntarziat(task) && <span className="rounded-full bg-rose-100 px-2 py-0.5 text-xs font-medium text-rose-700">Întârziat</span>}
+          {evAnulat && <span className="text-xs text-rose-600">Evenimentul este anulat — taskul e înghețat.</span>}
+        </div>
+      )}
+      {gestioneaza && <p className="mb-2 text-xs text-slate-400">Click pe un câmp ca să-l modifici; se salvează singur.</p>}
 
       <div className="divide-y divide-slate-100">
+        {rand('Status', <StatusDropdown status={task.status} poate={poateStatus && !ctx.inghetat(task)} poateAnula={ctx.poateGestiona(task)} onChange={status} />)}
+        {rand('Responsabil', camp('responsabil'))}
+        {rand('Termen', camp('data'))}
+        {rand('Tag', camp('tag'))}
+        {rand('Descriere', <Descriere task={task} ctx={ctx} poate={gestioneaza} onEroare={setEroare} />)}
+        {rand('Prioritate', camp('prioritate'))}
         {rand('Tip', task.tip === 'eveniment' ? 'Task de eveniment' : 'Task operațional')}
         {task.tip === 'eveniment' && rand('Eveniment', ev ? `${ev.nume} · ${formatData(ev.data)}` : '—')}
-        {task.tag && rand('Tag', <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">{task.tag}</span>)}
         {task.grup_id && rand('Departament', ctx.grupMap[task.grup_id]?.nume)}
-        {rand('Responsabil', task.responsabil_id ? ctx.nume(task.responsabil_id) : 'Fără responsabil')}
-        {colab.length > 0 && rand('Colaboratori', colab.map(ctx.nume).join(', '))}
-        {rand('Termen', task.termen ? formatData(task.termen) : 'Fără termen')}
-        {task.descriere && rand('Descriere', <span className="whitespace-pre-wrap">{task.descriere}</span>)}
-        {task.link_document && rand('Document', (
-          <a href={task.link_document} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-accent hover:underline">
-            Deschide <ExternalLink size={12} />
-          </a>
+        {rand('Colaboratori', gestioneaza
+          ? <AngajatiPicker angajati={ctx.angajatiCuAcces.filter((a) => a.id !== task.responsabil_id)} valoare={colab} onChange={seteazaColaboratori} />
+          : (colab.length ? colab.map(ctx.nume).join(', ') : <span className="text-slate-400">—</span>))}
+        {rand('Document', (
+          <span className="flex flex-wrap items-center gap-2">
+            {camp('link')}
+            {task.link_document && (
+              <a href={task.link_document} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-accent hover:underline">Deschide <ExternalLink size={12} /></a>
+            )}
+          </span>
         ))}
         {rand('Creat de', `${task.creat_de ? ctx.nume(task.creat_de) : '—'} · ${formatDataOra(task.created_at)}`)}
       </div>
 
-      {poateStatus && (
-        <div className="mt-4 flex flex-wrap gap-2">
-          {STATUSURI.filter((s) => s.cod !== task.status && (s.cod !== 'anulat' || ctx.poateGestiona(task))).map((s) => (
-            <button key={s.cod} type="button" onClick={() => status(s.cod)} className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50">
-              {s.cod === 'terminat' ? '✓ Marchează terminat' : s.cod === 'anulat' ? 'Anulează taskul' : `Treci în „${s.nume}"`}
-            </button>
-          ))}
-        </div>
-      )}
-
       {gestioneaza && (
         <div className="mt-3 flex gap-2">
-          <button type="button" onClick={() => onEdit(task)} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-slate-600 hover:bg-slate-100">
-            <Pencil size={14} /> Editează
-          </button>
           <button type="button" onClick={stergeTask} className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm text-rose-600 hover:bg-rose-50">
             <Trash2 size={14} /> Șterge
           </button>

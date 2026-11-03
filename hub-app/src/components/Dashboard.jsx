@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react'
 import { Plus, Settings } from 'lucide-react'
-import { supabase } from '../supabaseClient'
 import TaskuriMele from './home/TaskuriMele'
 import { EvenimenteleMele, EchipaMea, UrmatoareleEvenimente } from './home/CarduriDreapta'
 import { azi, dataAzi, esteDeschis, grupa, plusZile, prenume } from './home/date'
@@ -11,8 +10,6 @@ import { useTaskuri } from './taskuri/TaskuriContext'
 export default function Dashboard({ angajat, tooluri = [], onNavigate, onOpenCalendar }) {
   const { ctx, acte, eroare: eroareIncarcare, areTaskuri } = useTaskuri()
   const [filtru, setFiltru] = useState('Toate')
-  const [suprascrieri, setSuprascrieri] = useState({}) // id -> status afișat imediat, până se confirmă
-  const [eroare, setEroare] = useState('')
 
   const sapteZile = Date.now() - 7 * 24 * 3600 * 1000
   const taskuri = useMemo(() => {
@@ -20,25 +17,9 @@ export default function Dashboard({ angajat, tooluri = [], onNavigate, onOpenCal
     return ctx.taskuri
       .filter((t) => t.responsabil_id === angajat.id || (ctx.colabDupaTask[t.id] || []).includes(angajat.id))
       .filter((t) => esteDeschis(t) || (t.status === 'terminat' && t.terminat_la && new Date(t.terminat_la).getTime() >= sapteZile))
-      .map((t) => (suprascrieri[t.id] ? { ...t, status: suprascrieri[t.id] } : t))
-  }, [ctx, angajat.id, suprascrieri]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Status ales din meniul rândului. Se vede imediat; dacă baza de date refuză, revine.
-  async function seteazaStatus(t, nou) {
-    setEroare('')
-    setSuprascrieri((s) => ({ ...s, [t.id]: nou }))
-    const { error } = await supabase.rpc('tsk_schimba_status', { p_task: t.id, p_status: nou })
-    if (error) setEroare(error.code === 'P0001' ? error.message : 'Nu am putut schimba statusul.')
-    await ctx.reload()
-    setSuprascrieri((s) => {
-      const n = { ...s }
-      delete n[t.id]
-      return n
-    })
-  }
+  }, [ctx, angajat.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const evenimente = ctx?.evenimente || []
-  const evMap = ctx?.evMap || {}
   const evenimenteleMele = (ctx?.evenimenteMele || [])
     .map((e) => ({ ...e, comportament: ctx.comportament(e.id) }))
     .filter((e) => ['deschis', 'organizare'].includes(e.comportament))
@@ -75,7 +56,8 @@ export default function Dashboard({ angajat, tooluri = [], onNavigate, onOpenCal
     : []
   const urmatoare = urmatoareToate.slice(0, 4)
 
-  const poateCrea = !!ctx && (ctx.poateEveniment || ctx.poateOperational)
+  // fără acces la Taskuri nu se arată butonul de creare, chiar dacă ești PM la un eveniment
+  const poateCrea = areTaskuri && !!ctx && (ctx.poateEveniment || ctx.poateOperational)
   const esteAdminTaskuri = !!ctx?.admin
 
   const deschise = taskuri.filter(esteDeschis)
@@ -93,12 +75,14 @@ export default function Dashboard({ angajat, tooluri = [], onNavigate, onOpenCal
         })()
       : 'Niciun eveniment programat în curând'
 
+  // Cardurile sunt și filtre: click = filtrează lista de mai jos, click din nou = înapoi la „Toate"
   const casete = [
     ['Întârziate', nrIntarziate, 'au nevoie de atenție', nrIntarziate ? 'text-[#B4332E]' : '', ''],
-    ['Scadente azi', nrAzi, 'de făcut sau în lucru', '', ''],
+    ['Azi', nrAzi, 'de făcut sau în lucru', '', ''],
     ['Următoarele 7 zile', nr7, 'încă deschise', '', ''],
     ['Terminate', nrTerminate, 'în ultimele 7 zile', 'text-[#1E6B43]', 'hidden sm:block'],
   ]
+  const comutaFiltru = (f) => setFiltru((cur) => (cur === f ? 'Toate' : f))
 
   const butonTaskNou = (clase) => (
     <button type="button" onClick={() => acte.taskNou()} className={clase}>
@@ -123,7 +107,7 @@ export default function Dashboard({ angajat, tooluri = [], onNavigate, onOpenCal
         </div>
       </div>
 
-      {(eroare || eroareIncarcare) && <p className="text-sm text-rose-600">{eroare || eroareIncarcare}</p>}
+      {eroareIncarcare && <p className="text-sm text-rose-600">{eroareIncarcare}</p>}
 
       {!areTaskuri ? (
         ctx ? (
@@ -141,32 +125,28 @@ export default function Dashboard({ angajat, tooluri = [], onNavigate, onOpenCal
       ) : (
         <>
           <div className="flex flex-wrap gap-3 sm:gap-4">
-            {casete.map(([eticheta, n, cap, culoare, ascunde]) => (
-              <div key={eticheta} className={`min-w-[96px] flex-1 rounded-[14px] border border-[#E1E4EA] bg-white px-3.5 py-3 sm:min-w-[200px] sm:px-5 sm:py-[18px] ${ascunde}`}>
-                <div className="text-xs font-semibold text-[#5B6578] sm:text-[13px]">{eticheta}</div>
-                <div className={`my-1 text-[26px] font-extrabold leading-tight tracking-tight sm:text-[34px] ${culoare}`}>{ctx ? n : '–'}</div>
-                <div className="hidden text-[13px] text-[#5B6578] sm:block">{cap}</div>
-              </div>
-            ))}
+            {casete.map(([filtruCaseta, n, cap, culoare, ascunde]) => {
+              const activ = filtru === filtruCaseta
+              return (
+                <button
+                  key={filtruCaseta}
+                  type="button"
+                  aria-pressed={activ}
+                  onClick={() => comutaFiltru(filtruCaseta)}
+                  className={`min-w-[96px] flex-1 rounded-[14px] border bg-white px-3.5 py-3 text-left transition-colors hover:border-accent sm:min-w-[200px] sm:px-5 sm:py-[18px] ${activ ? 'border-accent ring-2 ring-accent/30' : 'border-[#E1E4EA]'} ${ascunde}`}
+                >
+                  <div className="text-xs font-semibold text-[#5B6578] sm:text-[13px]">{filtruCaseta === 'Azi' ? 'Scadente azi' : filtruCaseta}</div>
+                  <div className={`my-1 text-[26px] font-extrabold leading-tight tracking-tight sm:text-[34px] ${culoare}`}>{ctx ? n : '–'}</div>
+                  <div className="hidden text-[13px] text-[#5B6578] sm:block">{cap}</div>
+                </button>
+              )
+            })}
           </div>
 
           <div className="flex flex-wrap items-start gap-6">
             <div className="min-w-0 flex-[999_1_560px]">
               {ctx ? (
-                <TaskuriMele
-                  taskuri={taskuri}
-                  filtru={filtru}
-                  setFiltru={setFiltru}
-                  ctx={{
-                    me: angajat,
-                    nume: Object.fromEntries(ctx.angajati.map((a) => [a.id, a.nume_complet])),
-                    evenimente: evMap,
-                    onStatus: seteazaStatus,
-                    onDeschide: (t) => acte.deschideTask(t.id),
-                    poateStatus: (t) => ctx.poateSchimbaStatus(t) && !ctx.evenimentAnulat(t.eveniment_id),
-                    poateAnula: (t) => ctx.poateGestiona(t),
-                  }}
-                />
+                <TaskuriMele taskuri={taskuri} filtru={filtru} setFiltru={setFiltru} ctx={ctx} onOpen={(t) => acte.deschideTask(t.id)} />
               ) : (
                 <p className="text-sm text-[#5B6578]">Se încarcă taskurile…</p>
               )}

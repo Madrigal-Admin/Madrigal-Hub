@@ -6,9 +6,8 @@ import EvenimentPicker from './EvenimentPicker'
 import TagPicker from './TagPicker'
 import { Modal } from './Mici'
 
-// Creare / editare task. La editare, tipul și evenimentul nu se mai pot schimba.
-export default function TaskForm({ ctx, task, evenimentImplicit, onClose, onSaved }) {
-  const editare = !!task
+// Creare task nou. (Taskurile existente se modifică direct, din fereastra taskului sau din liste.)
+export default function TaskForm({ ctx, evenimentImplicit, onClose, onSaved }) {
   const tipuriPosibile = [ctx.poateEveniment && 'eveniment', ctx.poateOperational && 'operational'].filter(Boolean)
 
   const evenimenteAlegere = useMemo(
@@ -21,17 +20,17 @@ export default function TaskForm({ ctx, task, evenimentImplicit, onClose, onSave
   const grupuriAlegere = ctx.grupuri.filter((g) => g.activ && (ctx.admin || ctx.grupuriCoordonate.has(g.id)))
 
   const [f, setF] = useState(() => ({
-    tip: task?.tip || (evenimentImplicit ? 'eveniment' : tipuriPosibile[0]),
-    titlu: task?.titlu || '',
-    descriere: task?.descriere || '',
-    eveniment_id: task?.eveniment_id || evenimentImplicit || '',
-    grup_id: task?.grup_id || (grupuriAlegere.length === 1 ? grupuriAlegere[0].id : ''),
-    responsabil: task?.responsabil_id ? [task.responsabil_id] : [],
-    colaboratori: task ? ctx.colabDupaTask[task.id] || [] : [],
-    termen: task?.termen || '',
-    prioritate: task?.prioritate || 'medie',
-    link_document: task?.link_document || '',
-    tag: task?.tag || '',
+    tip: evenimentImplicit ? 'eveniment' : tipuriPosibile[0],
+    titlu: '',
+    descriere: '',
+    eveniment_id: evenimentImplicit || '',
+    grup_id: grupuriAlegere.length === 1 ? grupuriAlegere[0].id : '',
+    responsabil: [],
+    colaboratori: [],
+    termen: '',
+    prioritate: 'medie',
+    link_document: '',
+    tag: '',
   }))
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -67,35 +66,24 @@ export default function TaskForm({ ctx, task, evenimentImplicit, onClose, onSave
       tag: f.tag.trim() || null,
       ...(f.tip === 'operational' ? { grup_id: f.grup_id || null } : {}),
     }
-    let id = task?.id
-    if (editare) {
-      const { error: err } = await supabase.from('tsk_taskuri').update(date).eq('id', id)
-      if (err) { setBusy(false); return setError(mesajEroare(err)) }
-    } else {
-      const { data, error: err } = await supabase
-        .from('tsk_taskuri')
-        .insert({ ...date, tip: f.tip, eveniment_id: f.tip === 'eveniment' ? f.eveniment_id : null, creat_de: ctx.me.id })
-        .select('id')
-        .single()
-      if (err) { setBusy(false); return setError(mesajEroare(err)) }
-      id = data.id
-    }
+    const { data, error: err } = await supabase
+      .from('tsk_taskuri')
+      .insert({ ...date, tip: f.tip, eveniment_id: f.tip === 'eveniment' ? f.eveniment_id : null, creat_de: ctx.me.id })
+      .select('id')
+      .single()
+    if (err) { setBusy(false); return setError(mesajEroare(err)) }
+    const id = data.id
 
-    // colaboratori: adaug ce lipsește, scot ce nu mai e
-    const vechi = new Set(task ? ctx.colabDupaTask[task.id] || [] : [])
-    const noi = new Set(f.colaboratori)
-    const deAdaugat = [...noi].filter((x) => !vechi.has(x))
-    const deScos = [...vechi].filter((x) => !noi.has(x))
-    if (deAdaugat.length) {
-      const { error: err } = await supabase.from('tsk_colaboratori').insert(deAdaugat.map((angajat_id) => ({ task_id: id, angajat_id })))
-      if (err) { setBusy(false); await onSaved(); return setError('Taskul s-a salvat, dar colaboratorii nu: ' + mesajEroare(err, 'eroare necunoscută')) }
+    // colaboratori
+    if (f.colaboratori.length) {
+      const { error: err2 } = await supabase.from('tsk_colaboratori').insert(f.colaboratori.map((angajat_id) => ({ task_id: id, angajat_id })))
+      if (err2) { setBusy(false); await onSaved(); return setError('Taskul s-a salvat, dar colaboratorii nu: ' + mesajEroare(err2, 'eroare necunoscută')) }
     }
-    if (deScos.length) await supabase.from('tsk_colaboratori').delete().eq('task_id', id).in('angajat_id', deScos)
     setBusy(false)
     await onSaved()
   }
 
-  if (tipuriPosibile.length === 0 && !editare) {
+  if (tipuriPosibile.length === 0) {
     return (
       <Modal titlu="Task nou" onClose={onClose}>
         <p className="text-sm text-slate-600">Nu poți crea taskuri: nu ești PM la niciun eveniment și nici coordonator de departament.</p>
@@ -104,9 +92,9 @@ export default function TaskForm({ ctx, task, evenimentImplicit, onClose, onSave
   }
 
   return (
-    <Modal titlu={editare ? 'Editează taskul' : 'Task nou'} onClose={onClose} esc={false}>
+    <Modal titlu="Task nou" onClose={onClose} esc={false}>
       <form onSubmit={salveaza} className="space-y-4">
-        {!editare && tipuriPosibile.length > 1 && !evenimentImplicit && (
+        {tipuriPosibile.length > 1 && !evenimentImplicit && (
           <div>
             <label className={labelCls}>Tip task</label>
             <div className="flex flex-wrap gap-2.5">
@@ -134,7 +122,7 @@ export default function TaskForm({ ctx, task, evenimentImplicit, onClose, onSave
         {f.tip === 'eveniment' ? (
           <div>
             <label className={labelCls}>Eveniment *</label>
-            <EvenimentPicker evenimente={evenimenteAlegere} ctx={ctx} valoare={f.eveniment_id} dezactivat={editare || !!evenimentImplicit} onChange={(v) => set('eveniment_id', v)} />
+            <EvenimentPicker evenimente={evenimenteAlegere} ctx={ctx} valoare={f.eveniment_id} dezactivat={!!evenimentImplicit} onChange={(v) => set('eveniment_id', v)} />
           </div>
         ) : (
           <div>

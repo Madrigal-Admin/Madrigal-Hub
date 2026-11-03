@@ -32,7 +32,6 @@ export function TaskuriProvider({ angajat, accesTooluri, children }) {
     () => ({
       deschideTask: (id) => setFereastra({ tip: 'detaliu', id }),
       taskNou: (eveniment) => setFereastra({ tip: 'form', eveniment }),
-      editeaza: (task) => setFereastra({ tip: 'form', task }),
       checklist: (mod, eveniment) => setFereastra({ tip: 'checklist', mod, eveniment }),
       inchide: () => setFereastra(null),
     }),
@@ -45,17 +44,16 @@ export function TaskuriProvider({ angajat, accesTooluri, children }) {
     <Ctx.Provider value={valoare}>
       {children}
       {ctx && fereastra?.tip === 'detaliu' && (
-        <TaskDetaliu taskId={fereastra.id} ctx={ctx} onClose={acte.inchide} onEdit={(task) => setFereastra({ tip: 'form', task, revenire: task.id })} />
+        <TaskDetaliu taskId={fereastra.id} ctx={ctx} onClose={acte.inchide} />
       )}
       {ctx && fereastra?.tip === 'form' && (
         <TaskForm
           ctx={ctx}
-          task={fereastra.task}
           evenimentImplicit={fereastra.eveniment}
-          onClose={() => setFereastra(fereastra.revenire ? { tip: 'detaliu', id: fereastra.revenire } : null)}
+          onClose={acte.inchide}
           onSaved={async () => {
             await reload()
-            setFereastra(fereastra.revenire ? { tip: 'detaliu', id: fereastra.revenire } : null)
+            setFereastra(null)
           }}
         />
       )}

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useTaskuri } from './TaskuriContext'
 import Evenimente from './Evenimente'
 import TaskLista from './TaskLista'
+import TaguriAdmin from './TaguriAdmin'
 import GrupuriAdmin from './GrupuriAdmin'
 import ChecklistAdmin from './ChecklistAdmin'
 import DashboardEchipa from './DashboardEchipa'
@@ -111,7 +112,7 @@ export function PaginaSetari() {
   const [tab, setTab] = useState('toate')
   if (!ctx) return <Incarca />
   if (!ctx.admin) return <Cadru titlu="Setări Taskuri"><p className="text-sm text-slate-500">Nu ai acces la această pagină.</p></Cadru>
-  const taburi = [['toate', 'Toate taskurile'], ['grupuri', 'Departamente'], ['checklist', 'Checklist']]
+  const taburi = [['toate', 'Toate taskurile'], ['grupuri', 'Departamente'], ['checklist', 'Checklist'], ['taguri', 'Taguri']]
   return (
     <Cadru titlu="Setări Taskuri" descriere="Departamente, checklistul de organizare și vedere de ansamblu asupra taskurilor.">
       <div className="mb-5 flex flex-wrap gap-1 self-start rounded-lg bg-slate-100 p-1 text-sm">
@@ -124,6 +125,7 @@ export function PaginaSetari() {
       {tab === 'toate' && <TaskLista taskuri={ctx.taskuri} ctx={ctx} onOpen={(t) => acte.deschideTask(t.id)} />}
       {tab === 'grupuri' && <GrupuriAdmin ctx={ctx} />}
       {tab === 'checklist' && <ChecklistAdmin ctx={ctx} />}
+      {tab === 'taguri' && <TaguriAdmin ctx={ctx} />}
     </Cadru>
   )
 }

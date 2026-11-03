@@ -95,7 +95,7 @@ export default function Evenimente({ ctx, evenimente, onOpen, onTaskNou, onCheck
         )}
         {comp === 'anulat' && <p className="px-5 pb-3 text-xs text-rose-600">Eveniment anulat — taskurile lui sunt înghețate.</p>}
 
-        {!strans && taskuri.length > 0 && <TabelTaskuri taskuri={taskuri} ctx={ctx} onOpen={onOpen} onEroare={setEroare} />}
+        {!strans && taskuri.length > 0 && <TabelTaskuri taskuri={taskuri} ctx={ctx} onOpen={onOpen} onEroare={setEroare} bara={false} />}
         {!strans && taskuri.length === 0 && (
           <p className="border-t border-[#EEF0F4] px-5 py-3 text-[13px] text-[#5B6578] sm:pl-[46px]">
             {comp === 'deschis' ? 'Niciun task încă. Vei alege din checklist taskurile necesare când pornești organizarea.' : 'Niciun task la acest eveniment.'}
