@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { supabase } from '../../supabaseClient'
 import { PRIORITATI, STATUSURI, mesajEroare } from '../../lib/taskuri/ui'
 import { actualizeaza, optiuniResponsabil, poateEditaInLista } from '../../lib/taskuri/editare'
-import { tagurileCunoscute } from './TagPicker'
+import TagPicker from './TagPicker'
 
 const camp = 'rounded-md border border-white/40 bg-white px-2 py-1 text-xs text-[#172036] focus:outline-none'
 
@@ -80,8 +80,7 @@ export default function BaraEditareMasa({ taskuri, ctx, onGata }) {
       {camp_ === 'termen' && <input type="date" className={camp} value={valoare} onChange={(e) => setValoare(e.target.value)} aria-label="Termen nou (gol = fără termen)" />}
       {camp_ === 'tag' && (
         <>
-          <input className={camp} list="tagurile-masa" maxLength={60} value={valoare} onChange={(e) => setValoare(e.target.value)} placeholder="Tag (gol = fără tag)" aria-label="Tag nou" />
-          <datalist id="tagurile-masa">{tagurileCunoscute(ctx).map((t) => <option key={t} value={t} />)}</datalist>
+          <TagPicker ctx={ctx} valoare={valoare} onChange={setValoare} plutitor className={camp} placeholder="Tag (gol = fără tag)" ariaLabel="Tag nou" />
         </>
       )}
       <button type="button" disabled={busy} onClick={aplica} className="rounded-md bg-white px-3 py-1 text-xs font-bold text-[#22406B] hover:bg-[#E4ECF8] disabled:opacity-60">{busy ? 'Se aplică…' : 'Aplică'}</button>

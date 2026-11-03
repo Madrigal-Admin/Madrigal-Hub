@@ -36,13 +36,19 @@ function Eticheta({ t, ctx, arataEveniment, arataTag }) {
 function SelectorColoane({ coloane, schimba }) {
   const [deschis, setDeschis] = useState(false)
   const radacina = useRef(null)
+  const [poz, setPoz] = useState(null)
   useEffect(() => {
     if (!deschis) return
+    const r = radacina.current.getBoundingClientRect()
+    setPoz(window.innerHeight - r.bottom < 280 ? { bottom: window.innerHeight - r.top + 4, right: window.innerWidth - r.right } : { top: r.bottom + 4, right: window.innerWidth - r.right })
+    const inchide = () => setDeschis(false)
+    window.addEventListener('scroll', inchide, true)
+    window.addEventListener('resize', inchide)
     const afara = (e) => { if (radacina.current && !radacina.current.contains(e.target)) setDeschis(false) }
     const tasta = (e) => e.key === 'Escape' && setDeschis(false)
     document.addEventListener('mousedown', afara)
     document.addEventListener('keydown', tasta)
-    return () => { document.removeEventListener('mousedown', afara); document.removeEventListener('keydown', tasta) }
+    return () => { document.removeEventListener('mousedown', afara); document.removeEventListener('keydown', tasta); window.removeEventListener('scroll', inchide, true); window.removeEventListener('resize', inchide) }
   }, [deschis])
   return (
     <div className="relative" ref={radacina}>
@@ -50,7 +56,7 @@ function SelectorColoane({ coloane, schimba }) {
         <Columns3 size={14} aria-hidden="true" /> Coloane
       </button>
       {deschis && (
-        <div className="absolute right-0 z-30 mt-1 w-48 rounded-xl border border-[#E1E4EA] bg-white p-2 shadow-lg">
+        <div style={poz ? { position: 'fixed', ...poz } : { visibility: 'hidden' }} className="z-50 w-52 rounded-xl border border-[#E1E4EA] bg-white p-2 shadow-lg">
           {COLOANE_OPTIONALE.map(([k, e]) => (
             <label key={k} className="flex min-h-[36px] cursor-pointer items-center gap-2 rounded-md px-2 text-sm text-[#172036] hover:bg-[#F6F8FB]">
               <input type="checkbox" className="h-4 w-4 accent-[#22406B]" checked={coloane[k]} onChange={(e2) => schimba(k, e2.target.checked)} /> {e}

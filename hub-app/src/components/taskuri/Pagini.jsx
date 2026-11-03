@@ -125,7 +125,7 @@ export function PaginaSetari() {
       {tab === 'toate' && <TaskLista taskuri={ctx.taskuri} ctx={ctx} onOpen={(t) => acte.deschideTask(t.id)} />}
       {tab === 'grupuri' && <GrupuriAdmin ctx={ctx} />}
       {tab === 'checklist' && <ChecklistAdmin ctx={ctx} />}
-      {tab === 'taguri' && <TaguriAdmin ctx={ctx} />}
+      {tab === 'taguri' && <TaguriAdmin ctx={ctx} onChecklist={() => setTab('checklist')} />}
     </Cadru>
   )
 }

@@ -4,7 +4,7 @@ import { inputCls, mesajEroare } from '../../lib/taskuri/ui'
 
 // Gestionarea tagurilor (admin taskuri): vezi câte taskuri are fiecare, redenumești sau ștergi un tag.
 // Un tag există cât timp e pe cel puțin un task sau e o secțiune din Checklist.
-export default function TaguriAdmin({ ctx }) {
+export default function TaguriAdmin({ ctx, onChecklist }) {
   const [redenumit, setRedenumit] = useState(null) // { cheie, text }
   const [eroare, setEroare] = useState('')
   const [info, setInfo] = useState('')
@@ -26,6 +26,9 @@ export default function TaguriAdmin({ ctx }) {
     })
     return [...m.values()].sort((a, b) => a.nume.localeCompare(b.nume, 'ro'))
   }, [ctx.taskuri, ctx.sectiuni])
+
+  const libere = taguri.filter((t) => !t.checklist)
+  const dinChecklist = taguri.filter((t) => t.checklist)
 
   async function aplica(tag, valoareNoua, mesajOk) {
     setBusy(true)
@@ -55,15 +58,18 @@ export default function TaguriAdmin({ ctx }) {
   }
 
   return (
-    <div className="space-y-3">
-      <p className="text-sm text-slate-500">
-        Un tag apare aici cât timp e pe cel puțin un task. Tagurile marcate „din checklist" sunt secțiunile checklistului și se gestionează în tabul Checklist.
-      </p>
+    <div className="space-y-5">
       {eroare && <p className="text-sm text-rose-600">{eroare}</p>}
       {info && <p className="text-sm text-emerald-700">{info}</p>}
-      <div className="overflow-hidden rounded-xl bg-white shadow-sm">
-        {taguri.length === 0 && <p className="p-5 text-center text-sm text-slate-400">Niciun tag încă.</p>}
-        {taguri.map((t) => (
+
+      <section className="space-y-2">
+        <h3 className="text-sm font-bold text-slate-800">Taguri libere</h3>
+        <p className="text-sm text-slate-500">
+          Tagurile scrise de voi direct pe taskuri. Un tag nou apare aici când îl scrii pe un task („Creează tagul…”) și dispare singur când nu mai e pe niciun task. Aici le poți redenumi sau șterge.
+        </p>
+        <div className="overflow-hidden rounded-xl bg-white shadow-sm">
+          {libere.length === 0 && <p className="p-5 text-center text-sm text-slate-400">Niciun tag liber acum. Scrie un tag nou pe un task și apare aici.</p>}
+        {libere.map((t) => (
           <div key={t.cheie} className="flex flex-wrap items-center gap-3 border-b border-slate-100 px-4 py-2.5 last:border-0">
             {redenumit?.cheie === t.cheie ? (
               <>
@@ -86,7 +92,25 @@ export default function TaguriAdmin({ ctx }) {
             )}
           </div>
         ))}
-      </div>
+        </div>
+      </section>
+
+      <section className="space-y-2">
+        <h3 className="text-sm font-bold text-slate-800">Taguri din checklist</h3>
+        <p className="text-sm text-slate-500">
+          Taskurile create din checklist primesc automat ca tag numele secțiunii. Aceste taguri se schimbă doar din secțiunile checklistului.
+          {onChecklist && <> <button type="button" onClick={onChecklist} className="font-semibold text-accent underline">Deschide Checklist</button></>}
+        </p>
+        <div className="overflow-hidden rounded-xl bg-white shadow-sm">
+          {dinChecklist.map((t) => (
+            <div key={t.cheie} className="flex flex-wrap items-center gap-3 border-b border-slate-100 px-4 py-2.5 last:border-0">
+              <span className="rounded-md bg-slate-100 px-2 py-0.5 text-sm font-semibold text-slate-700">{t.nume}</span>
+              <span className="text-xs text-slate-500">{t.nr} {t.nr === 1 ? 'task' : 'taskuri'}</span>
+            </div>
+          ))}
+          {dinChecklist.length === 0 && <p className="p-5 text-center text-sm text-slate-400">Checklistul nu are secțiuni.</p>}
+        </div>
+      </section>
     </div>
   )
 }

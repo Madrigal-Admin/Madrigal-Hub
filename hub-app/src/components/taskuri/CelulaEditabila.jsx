@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { PRIORITATI, PRIORITATE_DUPA_COD, esteIntarziat, formatData } from '../../lib/taskuri/ui'
 import { actualizeaza, optiuniResponsabil } from '../../lib/taskuri/editare'
-import { tagurileCunoscute } from './TagPicker'
+import TagPicker from './TagPicker'
 
 const PUNCT = { mare: '#B4332E', medie: '#C77700', mica: '#7A869A' }
 const camp = 'w-full rounded-md border border-[#9AA6B8] bg-white px-2 py-1 text-[13px] text-[#172036] focus:border-accent focus:outline-none'
@@ -73,20 +73,7 @@ export default function CelulaEditabila({ tip, task, ctx, poate, onEroare, clasa
     )
   }
   if (tip === 'tag') {
-    const lista = `tagurile-${task.id}`
-    const comite = (v) => {
-      const nou = v.trim()
-      if (nou === (task.tag || '')) return renunta()
-      salveaza({ tag: nou || null })
-    }
-    return (
-      <>
-        <input className={camp} list={lista} maxLength={60} defaultValue={task.tag || ''} placeholder="Alege sau scrie un tag" {...comun}
-          onKeyDown={(e) => { if (e.key === 'Enter') comite(e.currentTarget.value); else tasta(e) }}
-          onBlur={(e) => comite(e.currentTarget.value)} />
-        <datalist id={lista}>{tagurileCunoscute(ctx).map((t) => <option key={t} value={t} />)}</datalist>
-      </>
-    )
+    return <TagEdit ctx={ctx} task={task} camp={camp} disabled={busy} salveaza={salveaza} renunta={renunta} />
   }
   // titlu, link: text pe o linie, se salvează la Enter sau la părăsirea câmpului
   const camp_ = tip === 'titlu' ? 'titlu' : 'link_document'
@@ -101,5 +88,18 @@ export default function CelulaEditabila({ tip, task, ctx, poate, onEroare, clasa
     <input className={`${camp} ${tip === 'titlu' ? 'text-base font-semibold' : ''}`} defaultValue={task[camp_] || ''} maxLength={tip === 'titlu' ? 200 : 500} {...comun}
       onKeyDown={(e) => { if (e.key === 'Enter') comite(e.currentTarget.value); else tasta(e) }}
       onBlur={(e) => comite(e.currentTarget.value)} />
+  )
+}
+
+// Editare tag direct în listă: alegi din lista tagurilor sau scrii unul nou; se salvează la alegere, Enter sau la ieșirea din câmp.
+function TagEdit({ ctx, task, camp, disabled, salveaza, renunta }) {
+  const [v, setV] = useState(task.tag || '')
+  const comite = (val) => {
+    const nou = val.trim()
+    if (nou === (task.tag || '')) return renunta()
+    salveaza({ tag: nou || null })
+  }
+  return (
+    <TagPicker ctx={ctx} valoare={v} onChange={setV} plutitor autoFocus disabled={disabled} className={camp} placeholder="Alege sau scrie un tag" ariaLabel="Tag" onAlege={comite} onEnter={comite} onBlur={comite} onEsc={renunta} />
   )
 }
