@@ -13,11 +13,12 @@ const CHEI_SORTARE = {
   deadline: (t) => t.termen || '9999-99-99',
   responsabil: (t, ctx) => (t.responsabil_id ? ctx.nume(t.responsabil_id).toLowerCase() : '~'),
   tag: (t) => (t.tag || '~').toLowerCase(),
+  grup: (t, ctx) => (ctx.grupMap?.[t.grup_id]?.nume || t.tag || '~').toLowerCase(),
   deschis: (t, ctx) => (t.creat_de ? ctx.nume(t.creat_de).toLowerCase() : '~'),
   prioritate: (t) => ORDINE_PRIORITATE[t.prioritate],
 }
-const LATIMI = { deadline: '96px', responsabil: '150px', tag: '130px', deschis: '150px', prioritate: '96px' }
-const ETICHETE = { status: 'Status', titlu: 'Titlu', deadline: 'Deadline', responsabil: 'Responsabil', tag: 'Tag', deschis: 'Deschis de', prioritate: 'Prioritate' }
+const LATIMI = { deadline: '96px', responsabil: '150px', tag: '130px', grup: '140px', deschis: '150px', prioritate: '96px' }
+const ETICHETE = { status: 'Status', titlu: 'Titlu', deadline: 'Deadline', responsabil: 'Responsabil', tag: 'Tag', grup: 'Grup', deschis: 'Deschis de', prioritate: 'Prioritate' }
 
 function Eticheta({ t, ctx, arataEveniment, arataTag }) {
   return (
@@ -69,11 +70,12 @@ function SelectorColoane({ coloane, schimba }) {
   )
 }
 
+// coloaneFixe: lista exactă de coloane afișate (fără selectorul „Coloane").
 // doarCitire: fără status, editare, selecție, ștergere si fără deschiderea taskului (pentru Privire Generală).
 // Tabel de taskuri folosit peste tot: sortare pe coloane, coloane la alegere, selecție multiplă cu
 // editare în masă și editare directă (doar la taskurile deschise de tine).
 // `grupare` (opțional): { ordine: [eticheta...], fn: (task) => eticheta } pentru secțiuni.
-export default function TabelTaskuri({ taskuri, ctx, onOpen, onEroare, arataEveniment = false, bara = true, grupare = null, doarCitire = false }) {
+export default function TabelTaskuri({ taskuri, ctx, onOpen, onEroare, arataEveniment = false, bara = true, grupare = null, doarCitire = false, coloaneFixe = null }) {
   const [suprascrieri, setSuprascrieri] = useState({})
   const [sortare, setSortare] = useState(null) // { cheie, dir }
   const [selectate, setSelectate] = useState(() => new Set())
@@ -131,7 +133,7 @@ export default function TabelTaskuri({ taskuri, ctx, onOpen, onEroare, arataEven
 
   if (taskuri.length === 0) return null
 
-  const vizibile = ['deadline', 'responsabil', 'tag', 'deschis', 'prioritate'].filter((k) => coloane[k])
+  const vizibile = coloaneFixe || ['deadline', 'responsabil', 'tag', 'deschis', 'prioritate'].filter((k) => coloane[k])
   const areStergere = !doarCitire && lista.some((t) => poateSterge(ctx, t))
   const sablon = [...(doarCitire ? [] : ['28px']), '112px', 'minmax(0,1fr)', ...vizibile.map((k) => LATIMI[k]), ...(areStergere ? ['32px'] : [])].join(' ')
   const stilGrid = { gridTemplateColumns: sablon }
@@ -166,7 +168,7 @@ export default function TabelTaskuri({ taskuri, ctx, onOpen, onEroare, arataEven
             <span className={`shrink-0 text-[13px] font-bold ${esteIntarziat(t) ? 'text-[#B4332E]' : 'text-[#172036]'}`}>{t.termen ? formatData(t.termen) : '—'}</span>
           </div>
           <div className="mt-1.5 flex items-center justify-between gap-2">
-            <span className="flex min-w-0 flex-wrap gap-1"><Eticheta t={t} ctx={ctx} arataEveniment={arataEveniment} arataTag /></span>
+            <span className="flex min-w-0 flex-wrap gap-1"><Eticheta t={t} ctx={ctx} arataEveniment={arataEveniment} arataTag={!coloaneFixe} /></span>
             <span className="flex shrink-0 items-center gap-1">{dd}{butonSterge}</span>
           </div>
         </div>
@@ -176,13 +178,14 @@ export default function TabelTaskuri({ taskuri, ctx, onOpen, onEroare, arataEven
           <div>{dd}</div>
           <div className="min-w-0">
             <button type="button" disabled={doarCitire} onClick={() => onOpen(t)} title={t.titlu} className={`block max-w-full truncate text-left text-sm font-semibold ${doarCitire ? 'cursor-default' : 'hover:underline'} ${inchis ? 'text-[#7A869A] line-through' : 'text-[#172036]'}`}>{t.titlu}</button>
-            <span className="mt-0.5 flex min-w-0 flex-wrap gap-1 empty:hidden"><Eticheta t={t} ctx={ctx} arataEveniment={arataEveniment} arataTag={!coloane.tag} /></span>
+            <span className="mt-0.5 flex min-w-0 flex-wrap gap-1 empty:hidden"><Eticheta t={t} ctx={ctx} arataEveniment={arataEveniment} arataTag={!coloane.tag && !coloaneFixe} /></span>
           </div>
           {vizibile.map((k) => (
             <div key={k} className="min-w-0 truncate text-[13px] text-[#172036]">
               {k === 'deadline' && <span className="font-bold">{celula('data')}</span>}
               {k === 'responsabil' && celula('responsabil')}
               {k === 'tag' && celula('tag')}
+              {k === 'grup' && <span title={ctx.grupMap?.[t.grup_id]?.nume || t.tag || ''}>{ctx.grupMap?.[t.grup_id]?.nume || t.tag || '—'}</span>}
               {k === 'prioritate' && <span className="text-[#5B6578]">{celula('prioritate')}</span>}
               {k === 'deschis' && <span title={t.creat_de ? ctx.nume(t.creat_de) : ''}>{t.creat_de ? ctx.nume(t.creat_de) : '—'}</span>}
             </div>
@@ -196,7 +199,7 @@ export default function TabelTaskuri({ taskuri, ctx, onOpen, onEroare, arataEven
   return (
     <div>
       {!doarCitire && alese.length > 0 && <BaraEditareMasa taskuri={alese} ctx={ctx} onGata={() => setSelectate(new Set())} />}
-      {bara && (doarCitire || alese.length === 0) && (
+      {bara && !coloaneFixe && (doarCitire || alese.length === 0) && (
         <div className="hidden justify-end border-t border-[#E1E4EA] px-5 py-0.5 sm:flex">
           <SelectorColoane coloane={coloane} schimba={schimbaColoana} />
         </div>
