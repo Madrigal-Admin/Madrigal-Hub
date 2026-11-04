@@ -38,7 +38,7 @@ export function TaskuriProvider({ angajat, accesTooluri, children }) {
     []
   )
 
-  const valoare = useMemo(() => ({ ctx, acte, eroare, areTaskuri: !!rol }), [ctx, acte, eroare, rol])
+  const valoare = useMemo(() => ({ ctx, acte, eroare, areTaskuri: !!rol, areRapoarte: accesTooluri.some((a) => a.tool === 'rapoarte') }), [ctx, acte, eroare, rol, accesTooluri])
 
   return (
     <Ctx.Provider value={valoare}>

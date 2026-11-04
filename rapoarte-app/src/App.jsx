@@ -25,6 +25,8 @@ function AppIntern() {
   const [angajat, setAngajat] = useState(null)
   const [view, setView] = useState('')
   const [checkingRole, setCheckingRole] = useState(false)
+  // link direct din Hub: .../rapoarte/?postev=<id eveniment> deschide formularul de raport pentru acel eveniment
+  const [evenimentLink, setEvenimentLink] = useState(() => new URLSearchParams(window.location.search).get('postev'))
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session))
@@ -58,7 +60,8 @@ function AppIntern() {
     const { data: rol } = await supabase.rpc('rap_rol')
     const r = rol || 'none'
     setRole(r)
-    setView(sectiuniPermise(r)[0]?.key || '')
+    const permise = sectiuniPermise(r)
+    setView(evenimentLink && permise.some((x) => x.key === 'postev') ? 'postev' : permise[0]?.key || '')
     setCheckingRole(false)
   }
 
@@ -102,7 +105,7 @@ function AppIntern() {
             {view === 'nedepuse' && <Nedepuse />}
             {view === 'persoane' && <PersoaneContracte />}
             {view === 'structura' && <Structura />}
-            {view === 'postev' && <PostevMele angajat={angajat} role={role} />}
+            {view === 'postev' && <PostevMele angajat={angajat} role={role} evenimentLink={evenimentLink} onLinkConsumat={() => { setEvenimentLink(null); window.history.replaceState(null, '', window.location.pathname) }} />}
             {view === 'postev-admin' && <PostevAdmin angajat={angajat} role={role} />}
             {view === 'dashboard' && <Dashboard />}
           </div>

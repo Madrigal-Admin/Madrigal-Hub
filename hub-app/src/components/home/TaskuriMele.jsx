@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { GRUPE, esteDeschis, grupa } from './date'
 import TabelTaskuri from '../taskuri/TabelTaskuri'
+import ButonExport from '../taskuri/ButonExport'
 
 // Secțiunile listei (constantă, ca tabelul să nu se recalculeze degeaba)
 const GRUPARE = { ordine: GRUPE, fn: grupa }
@@ -29,7 +30,7 @@ export default function TaskuriMele({ taskuri, filtru, setFiltru, ctx, onOpen })
     <section aria-label="Taskurile mele" className="min-w-0 overflow-hidden rounded-[14px] border border-[#E1E4EA] bg-white">
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-5">
         <h2 className="text-[19px] font-extrabold">Taskurile mele</h2>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {taburi.map(([nume, nr]) => (
             <button
               key={nume}
@@ -43,6 +44,7 @@ export default function TaskuriMele({ taskuri, filtru, setFiltru, ctx, onOpen })
               {nume === 'Următoarele 7 zile' ? '7 zile' : nume} · {nr}
             </button>
           ))}
+          <ButonExport taskuri={vizibile} ctx={ctx} numeFisier="taskurile-mele" clasa="hidden sm:inline-flex !rounded-full" filtre={[['Listă', 'Taskurile mele'], ['Filtru', filtru]]} />
         </div>
       </div>
       {eroare && <p className="px-5 pb-2 text-sm text-rose-600">{eroare}</p>}

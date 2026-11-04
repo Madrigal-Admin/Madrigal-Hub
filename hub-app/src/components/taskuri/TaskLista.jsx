@@ -3,9 +3,10 @@ import { Search } from 'lucide-react'
 import { STATUSURI, esteIntarziat, estePrelucrat, inputCls, sorteaza } from '../../lib/taskuri/ui'
 import { Gol } from './Mici'
 import TabelTaskuri from './TabelTaskuri'
+import ButonExport from './ButonExport'
 
 // Lista de taskuri cu filtre. Statusul se schimbă direct din listă (prin funcția din baza de date).
-export default function TaskLista({ taskuri, ctx, onOpen, arataEveniment = true, arataResponsabil = true }) {
+export default function TaskLista({ taskuri, ctx, onOpen, arataEveniment = true, arataResponsabil = true, doarCitire = false, numeFisier = 'taskuri' }) {
   const [text, setText] = useState('')
   const [filtruStatus, setFiltruStatus] = useState('deschise')
   const [resp, setResp] = useState('')
@@ -55,6 +56,11 @@ export default function TaskLista({ taskuri, ctx, onOpen, arataEveniment = true,
           </select>
         )}
         <span className="text-xs text-slate-400">{vizibile.length} din {taskuri.length}</span>
+        <ButonExport taskuri={vizibile} ctx={ctx} numeFisier={numeFisier} filtre={[
+          ['Status', filtruStatus === 'deschise' ? 'Doar deschise' : filtruStatus === 'toate' ? 'Toate' : filtruStatus === 'intarziate' ? 'Întârziate' : STATUSURI.find((x) => x.cod === filtruStatus)?.nume],
+          ['Responsabil', resp === '__nimeni' ? 'Fără responsabil' : resp ? ctx.nume(resp) : 'Toți'],
+          ['Căutare text', text.trim() || '—'],
+        ]} />
       </div>
 
       {eroare && <p className="mb-2 text-sm text-rose-600">{eroare}</p>}
@@ -63,7 +69,7 @@ export default function TaskLista({ taskuri, ctx, onOpen, arataEveniment = true,
         <Gol>{taskuri.length === 0 ? 'Nu există taskuri aici încă.' : 'Niciun task pentru filtrele alese.'}</Gol>
       ) : (
         <div className="overflow-hidden rounded-xl bg-white shadow-sm">
-          <TabelTaskuri taskuri={vizibile} ctx={ctx} onOpen={onOpen} onEroare={setEroare} arataEveniment={arataEveniment} />
+          <TabelTaskuri taskuri={vizibile} ctx={ctx} onOpen={onOpen} onEroare={setEroare} arataEveniment={arataEveniment} doarCitire={doarCitire} />
         </div>
       )}
     </div>

@@ -1,15 +1,19 @@
 import { useMemo, useState } from 'react'
-import { Plus, Settings } from 'lucide-react'
+import { Eye, Plus, Settings } from 'lucide-react'
 import TaskuriMele from './home/TaskuriMele'
 import { EvenimenteleMele, EchipaMea, UrmatoareleEvenimente } from './home/CarduriDreapta'
 import { azi, dataAzi, esteDeschis, grupa, plusZile, prenume } from './home/date'
 import FaraTaskuri from './home/FaraTaskuri'
 import { useTaskuri } from './taskuri/TaskuriContext'
+import PrivireGenerala from './taskuri/PrivireGenerala'
+import { raportLipsa, useRaportate } from '../lib/taskuri/raportLipsa'
 
 // Homepage orientat pe taskuri. Task nou / detaliu task / checklist se deschid ca ferestre deasupra paginii.
 export default function Dashboard({ angajat, tooluri = [], onNavigate, onOpenCalendar }) {
-  const { ctx, acte, eroare: eroareIncarcare, areTaskuri } = useTaskuri()
+  const { ctx, acte, eroare: eroareIncarcare, areTaskuri, areRapoarte } = useTaskuri()
+  const raportate = useRaportate(areRapoarte)
   const [filtru, setFiltru] = useState('Toate')
+  const [privire, setPrivire] = useState(false)
 
   const sapteZile = Date.now() - 7 * 24 * 3600 * 1000
   const taskuri = useMemo(() => {
@@ -24,6 +28,7 @@ export default function Dashboard({ angajat, tooluri = [], onNavigate, onOpenCal
     .map((e) => ({ ...e, comportament: ctx.comportament(e.id) }))
     .filter((e) => ['deschis', 'organizare'].includes(e.comportament))
     .sort((a, b) => (a.data || '').localeCompare(b.data || ''))
+  const faraRaport = (ctx?.evenimenteMele || []).filter((e) => raportLipsa(e, ctx, raportate)).sort((a, b) => (b.data || '').localeCompare(a.data || ''))
   const progres = useMemo(() => {
     const p = {}
     for (const t of ctx?.taskuri || []) {
@@ -103,6 +108,11 @@ export default function Dashboard({ angajat, tooluri = [], onNavigate, onOpenCal
               <Settings size={18} aria-hidden="true" /> Setări
             </button>
           )}
+          {esteAdminTaskuri && (
+            <button type="button" onClick={() => setPrivire(true)} className="inline-flex min-h-[44px] items-center gap-2 rounded-[10px] bg-[#DCEBFA] px-[18px] text-[15px] font-bold text-[#1F4E8C] hover:bg-[#CCE0F5]">
+              <Eye size={18} aria-hidden="true" /> Privire Generală
+            </button>
+          )}
           {poateCrea && butonTaskNou('inline-flex min-h-[44px] items-center gap-2 rounded-[10px] bg-accent px-[18px] text-[15px] font-bold text-white hover:bg-accent-hover')}
         </div>
       </div>
@@ -152,13 +162,15 @@ export default function Dashboard({ angajat, tooluri = [], onNavigate, onOpenCal
               )}
             </div>
             <aside className="flex min-w-0 flex-[1_1_340px] flex-col gap-6">
-              <EvenimenteleMele evenimente={evenimenteleMele} progres={progres} statusuri={ctx?.statusuri || []} onStart={(e) => acte.checklist('start', e)} onToate={() => onNavigate('evenimente')} />
+              <EvenimenteleMele raportLipsa={faraRaport} evenimente={evenimenteleMele} progres={progres} statusuri={ctx?.statusuri || []} onStart={(e) => acte.checklist('start', e)} onToate={() => onNavigate('evenimente')} />
               <EchipaMea departamente={departamente} onToate={() => onNavigate('departament')} />
               {ctx && <UrmatoareleEvenimente evenimente={urmatoare} onOpenCalendar={onOpenCalendar} />}
             </aside>
           </div>
         </>
       )}
+
+      {privire && ctx && <PrivireGenerala ctx={ctx} onClose={() => setPrivire(false)} />}
 
       {poateCrea &&
         butonTaskNou('fixed bottom-[84px] right-4 z-20 inline-flex min-h-[52px] items-center gap-2 rounded-[26px] bg-accent px-5 text-[15px] font-bold text-white shadow-[0_4px_14px_rgba(23,32,54,0.3)] sm:hidden')}

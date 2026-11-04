@@ -4,6 +4,8 @@ import { supabase } from '../../supabaseClient'
 import { estePrelucrat, formatData, mesajEroare, esteIntarziat } from '../../lib/taskuri/ui'
 import { culoareText } from '../../lib/evenimente'
 import { Gol } from './Mici'
+import { linkRaport, raportLipsa, useRaportate } from '../../lib/taskuri/raportLipsa'
+import { useTaskuri } from './TaskuriContext'
 import TabelTaskuri from './TabelTaskuri'
 
 const SECTIUNI = [
@@ -17,6 +19,7 @@ export default function Evenimente({ ctx, evenimente, onOpen, onTaskNou, onCheck
   const [inchise, setInchise] = useState(() => new Set()) // evenimente cu taskurile strânse
   const [arataInchise, setArataInchise] = useState(false)
   const [eroare, setEroare] = useState('')
+  const raportate = useRaportate(useTaskuri().areRapoarte)
 
   // În grupurile active: cele mai apropiate ca dată primele. La cele încheiate: cele mai recente primele.
   const grupuri = useMemo(() => {
@@ -66,6 +69,9 @@ export default function Evenimente({ ctx, evenimente, onOpen, onTaskNou, onCheck
             </span>
           </button>
           <span className="rounded-full px-3 py-1 text-xs font-bold" style={{ backgroundColor: `${st?.culoare}26`, color: culoareText(st?.culoare) }}>{st?.nume || e.status}</span>
+          {raportLipsa(e, ctx, raportate) && (
+            <a href={linkRaport(e)} className="inline-flex items-center gap-1 rounded-full bg-[#FFF1D6] px-3 py-1 text-xs font-bold text-[#8A4B12] hover:bg-[#FCE5B8]" title="Deschide formularul de raport pentru acest eveniment">Raport lipsă · Completează →</a>
+          )}
           {valide.length > 0 && (
             <div className="w-48">
               <div className="h-2 rounded-full bg-[#E9EDF3]"><div className="h-2 rounded-full bg-[#2E9E6B]" style={{ width: `${procent}%` }} /></div>

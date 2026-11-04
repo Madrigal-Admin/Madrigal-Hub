@@ -7,7 +7,7 @@ import PostevForm from './PostevForm'
 import PostevCard from './PostevCard'
 import EvenimentPicker from './EvenimentPicker'
 
-export default function PostevMele({ angajat, role }) {
+export default function PostevMele({ angajat, role, evenimentLink = null, onLinkConsumat }) {
   const cfg = usePostevConfig()
   const [rapoarte, setRapoarte] = useState([])
   const [loading, setLoading] = useState(true)
@@ -15,6 +15,7 @@ export default function PostevMele({ angajat, role }) {
   const [eveniment, setEveniment] = useState(null)
   const [editat, setEditat] = useState(null)
   const [userId, setUserId] = useState(null)
+  const [notaLink, setNotaLink] = useState('')
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id || null))
@@ -24,6 +25,29 @@ export default function PostevMele({ angajat, role }) {
     if (userId) load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId])
+
+  // Venit din Hub cu ?postev=<id>: deschidem direct formularul pentru evenimentul acela (dacă nu are deja raport).
+  useEffect(() => {
+    if (!evenimentLink) return
+    let activ = true
+    async function deschide() {
+      const [{ data: ev }, { data: raportate }] = await Promise.all([
+        supabase.from('evenimente').select('*, eveniment_tipuri(tip_cod), eveniment_pm(angajat_id)').eq('id', evenimentLink).maybeSingle(),
+        supabase.rpc('rap_evenimente_raportate'),
+      ])
+      if (!activ) return
+      if (!ev) setNotaLink('Evenimentul din link nu a fost găsit.')
+      else if ((raportate || []).includes(ev.id)) setNotaLink(`Pentru „${ev.nume}" există deja un raport.`)
+      else {
+        setEveniment({ ...ev, tipuri_coduri: (ev.eveniment_tipuri || []).map((x) => x.tip_cod), pm_ids: (ev.eveniment_pm || []).map((x) => x.angajat_id) })
+        setPas('formular')
+      }
+      onLinkConsumat?.()
+    }
+    deschide()
+    return () => { activ = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [evenimentLink])
 
   async function load() {
     setLoading(true)
@@ -81,6 +105,7 @@ export default function PostevMele({ angajat, role }) {
         <button onClick={() => setPas('alege')} className={btnPrimary}><Plus size={14} /> Raport nou</button>
       </div>
 
+      {notaLink && <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">{notaLink}</p>}
       {rapoarte.length === 0 && <p className="text-sm text-slate-500">Nu ai depus încă niciun raport post-eveniment.</p>}
 
       {rapoarte.map((r) => (

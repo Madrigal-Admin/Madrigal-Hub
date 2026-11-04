@@ -2,8 +2,8 @@ import { luna, zi } from './date'
 
 const carcasa = 'rounded-[14px] border border-[#E1E4EA] bg-white px-5 py-[18px]'
 
-export function EvenimenteleMele({ evenimente, progres, statusuri, onStart, onToate }) {
-  if (evenimente.length === 0) return null
+export function EvenimenteleMele({ evenimente, progres, statusuri, onStart, onToate, raportLipsa = [] }) {
+  if (evenimente.length === 0 && raportLipsa.length === 0) return null
   return (
     <section aria-label="Evenimentele mele" className={carcasa}>
       <div className="flex items-baseline justify-between gap-2">
@@ -46,6 +46,16 @@ export function EvenimenteleMele({ evenimente, progres, statusuri, onStart, onTo
             </div>
           )
         })}
+        {raportLipsa.map((e) => (
+          <a key={e.id} href={`/rapoarte/?postev=${e.id}`} className="block rounded-xl border border-[#F0D9A8] bg-[#FFF8E8] p-3.5 hover:bg-[#FFF1D6]">
+            <div className="flex items-start justify-between gap-2.5">
+              <div className="text-[15px] font-bold leading-snug text-[#172036]">{e.nume}</div>
+              <span className="shrink-0 rounded-full bg-[#FCE5B8] px-2.5 py-1 text-xs font-bold text-[#8A4B12]">Raport lipsă</span>
+            </div>
+            <div className="mt-1 text-[13px] text-[#5B6578]">{e.data ? `${zi(e.data)} ${luna(e.data)}` : ''} · eveniment încheiat</div>
+            <div className="mt-2 text-sm font-bold text-accent">Completează raportul →</div>
+          </a>
+        ))}
       </div>
       <button type="button" onClick={onToate} className="mt-2 inline-block py-3 text-sm font-bold text-accent hover:underline">Vezi toate evenimentele mele →</button>
     </section>

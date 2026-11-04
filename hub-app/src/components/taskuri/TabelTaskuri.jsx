@@ -69,10 +69,11 @@ function SelectorColoane({ coloane, schimba }) {
   )
 }
 
+// doarCitire: fără status, editare, selecție, ștergere si fără deschiderea taskului (pentru Privire Generală).
 // Tabel de taskuri folosit peste tot: sortare pe coloane, coloane la alegere, selecție multiplă cu
 // editare în masă și editare directă (doar la taskurile deschise de tine).
 // `grupare` (opțional): { ordine: [eticheta...], fn: (task) => eticheta } pentru secțiuni.
-export default function TabelTaskuri({ taskuri, ctx, onOpen, onEroare, arataEveniment = false, bara = true, grupare = null }) {
+export default function TabelTaskuri({ taskuri, ctx, onOpen, onEroare, arataEveniment = false, bara = true, grupare = null, doarCitire = false }) {
   const [suprascrieri, setSuprascrieri] = useState({})
   const [sortare, setSortare] = useState(null) // { cheie, dir }
   const [selectate, setSelectate] = useState(() => new Set())
@@ -131,8 +132,8 @@ export default function TabelTaskuri({ taskuri, ctx, onOpen, onEroare, arataEven
   if (taskuri.length === 0) return null
 
   const vizibile = ['deadline', 'responsabil', 'tag', 'deschis', 'prioritate'].filter((k) => coloane[k])
-  const areStergere = lista.some((t) => poateSterge(ctx, t))
-  const sablon = ['28px', '112px', 'minmax(0,1fr)', ...vizibile.map((k) => LATIMI[k]), ...(areStergere ? ['32px'] : [])].join(' ')
+  const areStergere = !doarCitire && lista.some((t) => poateSterge(ctx, t))
+  const sablon = [...(doarCitire ? [] : ['28px']), '112px', 'minmax(0,1fr)', ...vizibile.map((k) => LATIMI[k]), ...(areStergere ? ['32px'] : [])].join(' ')
   const stilGrid = { gridTemplateColumns: sablon }
   const clasaRand = 'grid items-center gap-x-3'
   const stare = (cheie) => (sortare?.cheie === cheie ? (sortare.dir === 1 ? 'ascending' : 'descending') : 'none')
@@ -145,15 +146,15 @@ export default function TabelTaskuri({ taskuri, ctx, onOpen, onEroare, arataEven
 
   const rand = (t) => {
     const inchis = t.status === 'terminat' || t.status === 'anulat'
-    const editabil = poateEditaInLista(ctx, t)
-    const butonSterge = poateSterge(ctx, t) && (
+    const editabil = !doarCitire && poateEditaInLista(ctx, t)
+    const butonSterge = !doarCitire && poateSterge(ctx, t) && (
       <button type="button" onClick={() => sterge(t)} className="flex h-8 w-8 items-center justify-center rounded-md text-[#7A869A] hover:bg-rose-50 hover:text-rose-600" title="Șterge taskul" aria-label={`Șterge taskul „${t.titlu}"`}>
         <Trash2 size={15} aria-hidden="true" />
       </button>
     )
     const aleasa = selectate.has(t.id)
     const dd = (
-      <StatusDropdown compact status={t.status} poate={ctx.poateSchimbaStatus(t) && !ctx.inghetat(t) && !ctx.evenimentAnulat(t.eveniment_id)} poateAnula={ctx.poateGestiona(t)} onChange={(s) => seteaza(t, s)} />
+      <StatusDropdown compact status={t.status} poate={!doarCitire && ctx.poateSchimbaStatus(t) && !ctx.inghetat(t) && !ctx.evenimentAnulat(t.eveniment_id)} poateAnula={!doarCitire && ctx.poateGestiona(t)} onChange={(s) => seteaza(t, s)} />
     )
     const celula = (tip) => <CelulaEditabila tip={tip} task={t} ctx={ctx} poate={editabil} onEroare={onEroare} />
     return (
@@ -161,7 +162,7 @@ export default function TabelTaskuri({ taskuri, ctx, onOpen, onEroare, arataEven
         {/* telefon: card compact */}
         <div className="border-t border-[#EEF0F4] px-4 py-2 sm:hidden">
           <div className="flex items-start justify-between gap-3">
-            <button type="button" onClick={() => onOpen(t)} className={`text-left text-[15px] font-semibold leading-snug hover:underline ${inchis ? 'text-[#7A869A] line-through' : 'text-[#172036]'}`}>{t.titlu}</button>
+            <button type="button" disabled={doarCitire} onClick={() => onOpen(t)} className={`text-left text-[15px] font-semibold leading-snug ${doarCitire ? 'cursor-default' : 'hover:underline'} ${inchis ? 'text-[#7A869A] line-through' : 'text-[#172036]'}`}>{t.titlu}</button>
             <span className={`shrink-0 text-[13px] font-bold ${esteIntarziat(t) ? 'text-[#B4332E]' : 'text-[#172036]'}`}>{t.termen ? formatData(t.termen) : '—'}</span>
           </div>
           <div className="mt-1.5 flex items-center justify-between gap-2">
@@ -171,10 +172,10 @@ export default function TabelTaskuri({ taskuri, ctx, onOpen, onEroare, arataEven
         </div>
         {/* desktop: rând de tabel */}
         <div style={stilGrid} className={`${clasaRand} hidden border-t border-[#EEF0F4] px-5 py-2 sm:grid ${aleasa ? 'bg-[#EEF3FB]' : 'hover:bg-[#FAFBFD]'}`}>
-          <div><input type="checkbox" className="h-4 w-4 accent-[#22406B]" checked={aleasa} onChange={() => comuta(t.id)} aria-label={`Selectează „${t.titlu}"`} /></div>
+          {!doarCitire && <div><input type="checkbox" className="h-4 w-4 accent-[#22406B]" checked={aleasa} onChange={() => comuta(t.id)} aria-label={`Selectează „${t.titlu}"`} /></div>}
           <div>{dd}</div>
           <div className="min-w-0">
-            <button type="button" onClick={() => onOpen(t)} title={t.titlu} className={`block max-w-full truncate text-left text-sm font-semibold hover:underline ${inchis ? 'text-[#7A869A] line-through' : 'text-[#172036]'}`}>{t.titlu}</button>
+            <button type="button" disabled={doarCitire} onClick={() => onOpen(t)} title={t.titlu} className={`block max-w-full truncate text-left text-sm font-semibold ${doarCitire ? 'cursor-default' : 'hover:underline'} ${inchis ? 'text-[#7A869A] line-through' : 'text-[#172036]'}`}>{t.titlu}</button>
             <span className="mt-0.5 flex min-w-0 flex-wrap gap-1 empty:hidden"><Eticheta t={t} ctx={ctx} arataEveniment={arataEveniment} arataTag={!coloane.tag} /></span>
           </div>
           {vizibile.map((k) => (
@@ -194,8 +195,8 @@ export default function TabelTaskuri({ taskuri, ctx, onOpen, onEroare, arataEven
 
   return (
     <div>
-      {alese.length > 0 && <BaraEditareMasa taskuri={alese} ctx={ctx} onGata={() => setSelectate(new Set())} />}
-      {bara && alese.length === 0 && (
+      {!doarCitire && alese.length > 0 && <BaraEditareMasa taskuri={alese} ctx={ctx} onGata={() => setSelectate(new Set())} />}
+      {bara && (doarCitire || alese.length === 0) && (
         <div className="hidden justify-end border-t border-[#E1E4EA] px-5 py-0.5 sm:flex">
           <SelectorColoane coloane={coloane} schimba={schimbaColoana} />
         </div>
@@ -203,7 +204,7 @@ export default function TabelTaskuri({ taskuri, ctx, onOpen, onEroare, arataEven
       <div className="overflow-x-auto">
         <div className="sm:min-w-[860px]">
           <div role="row" style={stilGrid} className={`${clasaRand} hidden border-t border-[#E1E4EA] bg-[#F6F8FB] px-5 py-1.5 text-[11px] font-bold text-[#5B6578] sm:grid`}>
-            <div><input type="checkbox" className="h-4 w-4 accent-[#22406B]" checked={toateAlese} onChange={() => setSelectate(toateAlese ? new Set() : new Set(lista.map((t) => t.id)))} aria-label="Selectează toate taskurile" /></div>
+            {!doarCitire && <div><input type="checkbox" className="h-4 w-4 accent-[#22406B]" checked={toateAlese} onChange={() => setSelectate(toateAlese ? new Set() : new Set(lista.map((t) => t.id)))} aria-label="Selectează toate taskurile" /></div>}
             {antet('status')}{antet('titlu')}{vizibile.map(antet)}{areStergere && <span />}
           </div>
           {sectiuni.map((s) => (
