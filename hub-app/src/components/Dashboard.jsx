@@ -6,6 +6,7 @@ import { azi, dataAzi, esteDeschis, grupa, plusZile, prenume } from './home/date
 import FaraTaskuri from './home/FaraTaskuri'
 import { useTaskuri } from './taskuri/TaskuriContext'
 import PrivireGenerala from './taskuri/PrivireGenerala'
+import { riscEveniment } from '../lib/taskuri/risc'
 import { raportLipsa, useRaportate } from '../lib/taskuri/raportLipsa'
 
 // Homepage orientat pe taskuri. Task nou / detaliu task / checklist se deschid ca ferestre deasupra paginii.
@@ -162,7 +163,7 @@ export default function Dashboard({ angajat, tooluri = [], onNavigate, onOpenCal
               )}
             </div>
             <aside className="flex min-w-0 flex-[1_1_340px] flex-col gap-6">
-              <EvenimenteleMele raportLipsa={faraRaport} evenimente={evenimenteleMele} progres={progres} statusuri={ctx?.statusuri || []} onStart={(e) => acte.checklist('start', e)} onToate={() => onNavigate('evenimente')} />
+              <EvenimenteleMele risc={Object.fromEntries(evenimenteleMele.map((e) => [e.id, ctx ? riscEveniment(e, ctx.taskuri).nivel : null]))} raportLipsa={faraRaport} evenimente={evenimenteleMele} progres={progres} statusuri={ctx?.statusuri || []} onStart={(e) => acte.checklist('start', e)} onToate={() => onNavigate('evenimente')} />
               <EchipaMea departamente={departamente} onToate={() => onNavigate('departament')} />
               {ctx && <UrmatoareleEvenimente evenimente={urmatoare} onOpenCalendar={onOpenCalendar} />}
             </aside>

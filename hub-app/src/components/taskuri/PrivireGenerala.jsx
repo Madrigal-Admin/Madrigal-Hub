@@ -1,3 +1,5 @@
+import { ChipRisc } from './RiscEvenimente'
+import { riscEveniment } from '../../lib/taskuri/risc'
 import { useMemo, useState } from 'react'
 import { Modal } from './Mici'
 import TabelTaskuri from './TabelTaskuri'
@@ -129,7 +131,10 @@ export default function PrivireGenerala({ ctx, onClose }) {
                 <div key={e.id} className="rounded-xl border border-[#E1E4EA] p-3.5">
                   <div className="flex items-start justify-between gap-2.5">
                     <div className="text-[15px] font-bold leading-snug text-[#172036]">{e.nume}</div>
-                    <span className="shrink-0 rounded-full bg-[#EEF1F6] px-2.5 py-1 text-xs font-bold text-[#3A465C]">{ctx.statusMap[e.status]?.nume || e.status}</span>
+                    <span className="flex shrink-0 flex-col items-end gap-1">
+                      <span className="rounded-full bg-[#EEF1F6] px-2.5 py-1 text-xs font-bold text-[#3A465C]">{ctx.statusMap[e.status]?.nume || e.status}</span>
+                      {['deschis', 'organizare'].includes(ctx.comportament(e.id)) && <ChipRisc nivel={riscEveniment(e, ctx.taskuri).nivel} mic />}
+                    </span>
                   </div>
                   <div className="mt-1 text-[13px] text-[#5B6578]">
                     {dataEv(e)}{e.localitate ? ` · ${e.localitate}` : ''}{e.pm.length ? ` · PM: ${e.pm.map((id) => ctx.nume(id)).join(', ')}` : ''}

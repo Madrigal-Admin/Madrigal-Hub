@@ -82,7 +82,9 @@ export default function EvenimentForm({ eveniment, tipuri, statusuri, angajati, 
     })
     setBusy(false)
     if (err) return setError(mesajEroare(err))
-    onSaved()
+    // Dacă s-a mutat data unui eveniment existent, anunțăm calendarul (care poate propune decalarea termenelor).
+    const mutat = editare && eveniment.data && eveniment.data !== f.data && !esteAnulat
+    onSaved(mutat ? { id: eveniment.id, de: eveniment.data, la: f.data } : null)
   }
 
   async function sterge() {

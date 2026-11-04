@@ -59,7 +59,7 @@ export function PaginaEvenimente() {
             <SelectorEvenimente evenimente={mele} selectate={selectate} onChange={setSelectate} />
           </div>
           {tab === 'dashboard' ? (
-            <DashboardEvenimente taskuri={taskuriDashboard} ctx={ctx} />
+            <DashboardEvenimente taskuri={taskuriDashboard} ctx={ctx} evenimente={pentruDashboard} onOpen={(t) => acte.deschideTask(t.id)} />
           ) : (
             <Evenimente ctx={ctx} evenimente={pentruLista} onOpen={(t) => acte.deschideTask(t.id)} onTaskNou={(evId) => acte.taskNou(evId)} onChecklist={(mod, e) => acte.checklist(mod, e)} />
           )}

@@ -1,8 +1,9 @@
 import { luna, zi } from './date'
+import { ChipRisc } from '../taskuri/RiscEvenimente'
 
 const carcasa = 'rounded-[14px] border border-[#E1E4EA] bg-white px-5 py-[18px]'
 
-export function EvenimenteleMele({ evenimente, progres, statusuri, onStart, onToate, raportLipsa = [] }) {
+export function EvenimenteleMele({ evenimente, progres, statusuri, onStart, onToate, raportLipsa = [], risc = {} }) {
   if (evenimente.length === 0 && raportLipsa.length === 0) return null
   return (
     <section aria-label="Evenimentele mele" className={carcasa}>
@@ -19,7 +20,10 @@ export function EvenimenteleMele({ evenimente, progres, statusuri, onStart, onTo
             <div key={e.id} className="rounded-xl border border-[#E1E4EA] p-3.5">
               <div className="flex items-start justify-between gap-2.5">
                 <div className="text-[15px] font-bold leading-snug">{e.nume}</div>
-                <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${organizare ? 'bg-[#E4ECF8] text-accent' : 'bg-[#EEF1F6] text-[#3A465C]'}`}>{st?.nume || e.status}</span>
+                <span className="flex shrink-0 flex-col items-end gap-1">
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${organizare ? 'bg-[#E4ECF8] text-accent' : 'bg-[#EEF1F6] text-[#3A465C]'}`}>{st?.nume || e.status}</span>
+                  {organizare && risc[e.id] && <ChipRisc nivel={risc[e.id]} mic />}
+                </span>
               </div>
               <div className="mt-1 text-[13px] text-[#5B6578]">
                 {e.data ? `${zi(e.data)} ${luna(e.data)}` : ''}{e.localitate ? ` · ${e.localitate}` : ''}

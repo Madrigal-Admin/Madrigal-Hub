@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { esteIntarziat, estePrelucrat } from '../../lib/taskuri/ui'
+import { ListaRisc, ListaDeAlocat } from './RiscEvenimente'
 import { CULORI_SERIE, CULORI_STATUS, CULOARE_FARA, Casete, Placinta, ProgresPeTag } from './Grafice'
 
 const NUME_STATUS = { de_facut: 'De făcut', in_lucru: 'În lucru', terminat: 'Terminat' }
@@ -31,7 +32,7 @@ export function progresPeTag(taskuri) {
 }
 
 // Dashboardul „Evenimentele mele": 2 grafice (responsabil, status) + progres pe tag.
-export default function DashboardEvenimente({ taskuri, ctx }) {
+export default function DashboardEvenimente({ taskuri, ctx, evenimente = [], onOpen }) {
   const { active, responsabil, status } = useMemo(() => felii(taskuri, ctx), [taskuri, ctx])
   const taguri = useMemo(() => progresPeTag(taskuri), [taskuri])
   return (
@@ -44,6 +45,10 @@ export default function DashboardEvenimente({ taskuri, ctx }) {
           ['Întârziate', active.filter(esteIntarziat).length, active.some(esteIntarziat) ? 'text-[#B4332E]' : ''],
         ]}
       />
+      <div className="grid gap-4 lg:grid-cols-2">
+        <ListaRisc evenimente={evenimente} taskuri={taskuri} />
+        <ListaDeAlocat ctx={ctx} evenimente={evenimente} taskuri={taskuri} onOpen={onOpen} />
+      </div>
       <div className="grid gap-4 lg:grid-cols-2">
         <Placinta titlu="Taskuri pe responsabil" felii={responsabil} gol="Niciun task pentru evenimentele alese." />
         <Placinta titlu="Taskuri pe status" felii={status} gol="Niciun task pentru evenimentele alese." />

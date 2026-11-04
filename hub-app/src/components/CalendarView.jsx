@@ -5,6 +5,8 @@ import EvenimentForm from './EvenimentForm'
 import ListeEvenimente from './ListeEvenimente'
 import StatisticiEvenimente from './StatisticiEvenimente'
 import FiltruMulti from './FiltruMulti'
+import { useTaskuri } from './taskuri/TaskuriContext'
+import DecalareTermene, { taskuriDecalabile } from './taskuri/DecalareTermene'
 import {
   IMPLICARE_CULORI, ZILE_SAPT, LUNI, formatData, ymd, formatOra, zileEveniment, culoareText, initiale, incarcaTot,
 } from '../lib/evenimente'
@@ -32,6 +34,8 @@ export default function CalendarView({ canManageCalendar, canSeeStatistici }) {
   const [statusFilter, setStatusFilter] = useState(() => new Set())
   const [localitateFilter, setLocalitateFilter] = useState(() => new Set())
   const [calitateFilter, setCalitateFilter] = useState(() => new Set())
+  const ctxTaskuri = useTaskuri()?.ctx
+  const [decalare, setDecalare] = useState(null)
   const [formDeschis, setFormDeschis] = useState(null) // null | 'nou' | eveniment
   const [showListe, setShowListe] = useState(false)
   const [showStatistici, setShowStatistici] = useState(false)
@@ -128,9 +132,11 @@ export default function CalendarView({ canManageCalendar, canSeeStatistici }) {
     setZiuaSelectata(null)
   }
 
-  function dupaSalvare() {
+  function dupaSalvare(info) {
     setFormDeschis(null)
     load()
+    // Întrebăm doar dacă există taskuri pe care le poți decala.
+    if (info && taskuriDecalabile(ctxTaskuri, info.id).length > 0) setDecalare(info)
   }
 
   return (
@@ -373,6 +379,8 @@ export default function CalendarView({ canManageCalendar, canSeeStatistici }) {
           onSaved={dupaSalvare}
         />
       )}
+
+      {decalare && ctxTaskuri && <DecalareTermene ctx={ctxTaskuri} info={decalare} onClose={() => setDecalare(null)} />}
 
       {showStatistici && (
         <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-3 sm:p-6" onClick={() => setShowStatistici(false)}>
