@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../../supabaseClient'
 import { PRIORITATI, STATUSURI, mesajEroare } from '../../lib/taskuri/ui'
-import { actualizeaza, optiuniResponsabil, poateEditaInLista } from '../../lib/taskuri/editare'
+import { actualizeaza, optiuniResponsabil, poateEditaInLista, poateSterge, stergeTaskuri } from '../../lib/taskuri/editare'
 import TagPicker from './TagPicker'
 
 const camp = 'rounded-md border border-white/40 bg-white px-2 py-1 text-xs text-[#172036] focus:outline-none'
@@ -47,6 +47,21 @@ export default function BaraEditareMasa({ taskuri, ctx, onGata }) {
     setMesaj(`Modificate: ${reusite}. Sărite: ${sarite}${camp_ === 'status' ? '' : ' (nu sunt deschise de tine)'}${erori.size ? ` — ${[...erori].join(' ')}` : ''}`)
   }
 
+  async function sterge() {
+    const permise = taskuri.filter((t) => poateSterge(ctx, t))
+    if (permise.length === 0) return setMesaj('Nu ai dreptul să ștergi niciunul dintre taskurile selectate.')
+    const nr = permise.length
+    if (!window.confirm(`Ștergi definitiv ${nr} ${nr === 1 ? 'task' : 'taskuri'}? Nu se poate reveni.${nr < taskuri.length ? ` (Celelalte ${taskuri.length - nr} nu pot fi șterse de tine și rămân.)` : ''}`)) return
+    setBusy(true)
+    setMesaj('')
+    const err = await stergeTaskuri(permise.map((t) => t.id))
+    await ctx.reload()
+    setBusy(false)
+    if (err) return setMesaj(err)
+    if (nr === taskuri.length) return onGata()
+    setMesaj(`Șterse: ${nr}. Rămase (fără drept de ștergere): ${taskuri.length - nr}.`)
+  }
+
   const optResp = [...new Map(taskuri.flatMap((t) => optiuniResponsabil(ctx, t)).map((a) => [a.id, a])).values()]
 
   return (
@@ -84,6 +99,7 @@ export default function BaraEditareMasa({ taskuri, ctx, onGata }) {
         </>
       )}
       <button type="button" disabled={busy} onClick={aplica} className="rounded-md bg-white px-3 py-1 text-xs font-bold text-[#22406B] hover:bg-[#E4ECF8] disabled:opacity-60">{busy ? 'Se aplică…' : 'Aplică'}</button>
+      <button type="button" disabled={busy} onClick={sterge} className="rounded-md border border-white/60 px-3 py-1 text-xs font-bold text-white hover:bg-white/10 disabled:opacity-60">Șterge selecția</button>
       <button type="button" onClick={onGata} className="underline">Renunță</button>
       {mesaj && <span className="basis-full font-medium text-[#FDE8D2]">{mesaj}</span>}
     </div>

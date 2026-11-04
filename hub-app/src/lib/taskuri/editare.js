@@ -12,6 +12,16 @@ export const poateEditaInLista = (ctx, t) =>
   !ctx.inghetat(t) &&
   !(t.tip === 'eveniment' && ctx.evenimentAnulat(t.eveniment_id))
 
+// Ștergerea: aceeași regulă ca în fereastra taskului (cine gestionează taskul, dacă evenimentul nu e anulat).
+// Baza de date verifică oricum dreptul.
+export const poateSterge = (ctx, t) => ctx.poateGestiona(t) && !(t.tip === 'eveniment' && ctx.evenimentAnulat(t.eveniment_id))
+
+// Șterge definitiv taskuri. Întoarce un mesaj de eroare, sau '' dacă a mers.
+export async function stergeTaskuri(ids) {
+  const { error } = await supabase.from('tsk_taskuri').delete().in('id', ids)
+  return error ? mesajEroare(error, 'Nu am putut șterge.') : ''
+}
+
 // Salvează câmpuri pe un task. Întoarce un mesaj de eroare, sau '' dacă a mers.
 export async function actualizeaza(id, patch) {
   const { error } = await supabase.from('tsk_taskuri').update(patch).eq('id', id)

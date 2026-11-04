@@ -223,7 +223,7 @@ export default function EmployeeDashboard({ employee, onNavigate }) {
         ))}
       </div>
 
-      <div className="mt-8 grid gap-4 sm:grid-cols-2">
+      <div className="mt-8 space-y-8">
         <div>
           <h2 className="font-display text-lg font-semibold text-ink">Medicina muncii</h2>
           <div className="mt-3 space-y-2">

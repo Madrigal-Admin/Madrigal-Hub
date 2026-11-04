@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronDown, ChevronUp, ChevronsUpDown, Columns3 } from 'lucide-react'
+import { ChevronDown, ChevronUp, ChevronsUpDown, Columns3, Trash2 } from 'lucide-react'
 import { supabase } from '../../supabaseClient'
 import { esteIntarziat, formatData, mesajEroare, sorteaza } from '../../lib/taskuri/ui'
-import { COLOANE_OPTIONALE, ORDINE_PRIORITATE, ORDINE_STATUS, poateEditaInLista, useColoane } from '../../lib/taskuri/editare'
+import { COLOANE_OPTIONALE, ORDINE_PRIORITATE, ORDINE_STATUS, poateEditaInLista, poateSterge, stergeTaskuri, useColoane } from '../../lib/taskuri/editare'
 import StatusDropdown from './StatusDropdown'
 import CelulaEditabila from './CelulaEditabila'
 import BaraEditareMasa from './BaraEditareMasa'
@@ -112,6 +112,15 @@ export default function TabelTaskuri({ taskuri, ctx, onOpen, onEroare, arataEven
     setSuprascrieri((s) => { const n = { ...s }; delete n[t.id]; return n })
   }
 
+  async function sterge(t) {
+    if (!window.confirm(`Ștergi definitiv taskul „${t.titlu}"? Nu se poate reveni. Dacă vrei doar să-l oprești, schimbă statusul în „Anulat".`)) return
+    onEroare?.('')
+    const err = await stergeTaskuri([t.id])
+    if (err) return onEroare?.(err)
+    setSelectate((s) => { const n = new Set(s); n.delete(t.id); return n })
+    await ctx.reload()
+  }
+
   function comuta(id) {
     setSelectate((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n })
   }
@@ -122,7 +131,8 @@ export default function TabelTaskuri({ taskuri, ctx, onOpen, onEroare, arataEven
   if (taskuri.length === 0) return null
 
   const vizibile = ['deadline', 'responsabil', 'tag', 'deschis', 'prioritate'].filter((k) => coloane[k])
-  const sablon = ['28px', '112px', 'minmax(0,1fr)', ...vizibile.map((k) => LATIMI[k])].join(' ')
+  const areStergere = lista.some((t) => poateSterge(ctx, t))
+  const sablon = ['28px', '112px', 'minmax(0,1fr)', ...vizibile.map((k) => LATIMI[k]), ...(areStergere ? ['32px'] : [])].join(' ')
   const stilGrid = { gridTemplateColumns: sablon }
   const clasaRand = 'grid items-center gap-x-3'
   const stare = (cheie) => (sortare?.cheie === cheie ? (sortare.dir === 1 ? 'ascending' : 'descending') : 'none')
@@ -136,6 +146,11 @@ export default function TabelTaskuri({ taskuri, ctx, onOpen, onEroare, arataEven
   const rand = (t) => {
     const inchis = t.status === 'terminat' || t.status === 'anulat'
     const editabil = poateEditaInLista(ctx, t)
+    const butonSterge = poateSterge(ctx, t) && (
+      <button type="button" onClick={() => sterge(t)} className="flex h-8 w-8 items-center justify-center rounded-md text-[#7A869A] hover:bg-rose-50 hover:text-rose-600" title="Șterge taskul" aria-label={`Șterge taskul „${t.titlu}"`}>
+        <Trash2 size={15} aria-hidden="true" />
+      </button>
+    )
     const aleasa = selectate.has(t.id)
     const dd = (
       <StatusDropdown compact status={t.status} poate={ctx.poateSchimbaStatus(t) && !ctx.inghetat(t) && !ctx.evenimentAnulat(t.eveniment_id)} poateAnula={ctx.poateGestiona(t)} onChange={(s) => seteaza(t, s)} />
@@ -151,7 +166,7 @@ export default function TabelTaskuri({ taskuri, ctx, onOpen, onEroare, arataEven
           </div>
           <div className="mt-1.5 flex items-center justify-between gap-2">
             <span className="flex min-w-0 flex-wrap gap-1"><Eticheta t={t} ctx={ctx} arataEveniment={arataEveniment} arataTag /></span>
-            {dd}
+            <span className="flex shrink-0 items-center gap-1">{dd}{butonSterge}</span>
           </div>
         </div>
         {/* desktop: rând de tabel */}
@@ -171,6 +186,7 @@ export default function TabelTaskuri({ taskuri, ctx, onOpen, onEroare, arataEven
               {k === 'deschis' && <span title={t.creat_de ? ctx.nume(t.creat_de) : ''}>{t.creat_de ? ctx.nume(t.creat_de) : '—'}</span>}
             </div>
           ))}
+          {areStergere && <div className="flex justify-end">{butonSterge}</div>}
         </div>
       </div>
     )
@@ -188,7 +204,7 @@ export default function TabelTaskuri({ taskuri, ctx, onOpen, onEroare, arataEven
         <div className="sm:min-w-[860px]">
           <div role="row" style={stilGrid} className={`${clasaRand} hidden border-t border-[#E1E4EA] bg-[#F6F8FB] px-5 py-1.5 text-[11px] font-bold text-[#5B6578] sm:grid`}>
             <div><input type="checkbox" className="h-4 w-4 accent-[#22406B]" checked={toateAlese} onChange={() => setSelectate(toateAlese ? new Set() : new Set(lista.map((t) => t.id)))} aria-label="Selectează toate taskurile" /></div>
-            {antet('status')}{antet('titlu')}{vizibile.map(antet)}
+            {antet('status')}{antet('titlu')}{vizibile.map(antet)}{areStergere && <span />}
           </div>
           {sectiuni.map((s) => (
             <div key={s.eticheta || 'toate'}>
