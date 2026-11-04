@@ -15,14 +15,25 @@ export default function Dashboard({ angajat, tooluri = [], onNavigate, onOpenCal
   const raportate = useRaportate(areRapoarte)
   const [filtru, setFiltru] = useState('Toate')
   const [privire, setPrivire] = useState(false)
+  const [vedere, setVedere] = useState('atribuite') // 'atribuite' = ale mele | 'deschise' = deschise de mine, atribuite altora
 
   const sapteZile = Date.now() - 7 * 24 * 3600 * 1000
-  const taskuri = useMemo(() => {
-    if (!ctx) return []
-    return ctx.taskuri
-      .filter((t) => t.responsabil_id === angajat.id || (ctx.colabDupaTask[t.id] || []).includes(angajat.id))
-      .filter((t) => esteDeschis(t) || (t.status === 'terminat' && t.terminat_la && new Date(t.terminat_la).getTime() >= sapteZile))
+  const { taskuriAtribuite, taskuriDeschise } = useMemo(() => {
+    if (!ctx) return { taskuriAtribuite: [], taskuriDeschise: [] }
+    const recent = (t) => esteDeschis(t) || (t.status === 'terminat' && t.terminat_la && new Date(t.terminat_la).getTime() >= sapteZile)
+    return {
+      taskuriAtribuite: ctx.taskuri
+        .filter((t) => t.responsabil_id === angajat.id || (ctx.colabDupaTask[t.id] || []).includes(angajat.id))
+        .filter(recent),
+      // taskurile deschise de mine pentru altcineva (sau încă nealocate)
+      taskuriDeschise: ctx.taskuri.filter((t) => t.creat_de === angajat.id && t.responsabil_id !== angajat.id).filter(recent),
+    }
   }, [ctx, angajat.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  const taskuri = vedere === 'deschise' ? taskuriDeschise : taskuriAtribuite
+  const nrDeschiseAtribuite = taskuriAtribuite.filter(esteDeschis).length
+  const nrDeschiseDeMine = taskuriDeschise.filter(esteDeschis).length
+  // comutatorul apare doar dacă ai deschis taskuri pentru alții (sau poți deschide)
+  const areVedereDeschise = taskuriDeschise.length > 0 || (!!ctx && (ctx.poateEveniment || ctx.poateOperational))
 
   const evenimente = ctx?.evenimente || []
   const evenimenteleMele = (ctx?.evenimenteMele || [])
@@ -72,8 +83,11 @@ export default function Dashboard({ angajat, tooluri = [], onNavigate, onOpenCal
   const nr7 = deschise.filter((t) => grupa(t) === 'Următoarele 7 zile').length
   const nrTerminate = taskuri.filter((t) => t.status === 'terminat').length
 
+  const proprii = taskuriAtribuite.filter(esteDeschis)
+  const propriiIntarziate = proprii.filter((t) => grupa(t) === 'Întârziate').length
+  const propriiAzi = proprii.filter((t) => grupa(t) === 'Azi').length
   const rezumat = areTaskuri
-    ? `${nrIntarziate ? `${nrIntarziate} ${nrIntarziate === 1 ? 'task întârziat' : 'taskuri întârziate'}` : 'niciun task întârziat'} · ${nrAzi ? `${nrAzi} ${nrAzi === 1 ? 'scadent azi' : 'scadente azi'}` : 'nimic scadent azi'}`
+    ? `${propriiIntarziate ? `${propriiIntarziate} ${propriiIntarziate === 1 ? 'task întârziat' : 'taskuri întârziate'}` : 'niciun task întârziat'} · ${propriiAzi ? `${propriiAzi} ${propriiAzi === 1 ? 'scadent azi' : 'scadente azi'}` : 'nimic scadent azi'}`
     : urmatoareToate.length
       ? (() => {
           const n = urmatoareToate.filter((e) => e.data <= plusZile(7)).length
@@ -83,7 +97,7 @@ export default function Dashboard({ angajat, tooluri = [], onNavigate, onOpenCal
 
   // Cardurile sunt și filtre: click = filtrează lista de mai jos, click din nou = înapoi la „Toate"
   const casete = [
-    ['Întârziate', nrIntarziate, 'au nevoie de atenție', nrIntarziate ? 'text-[#B4332E]' : '', ''],
+    ['Întârziate', nrIntarziate, vedere === 'deschise' ? 'taskuri date de tine, în întârziere' : 'au nevoie de atenție', nrIntarziate ? 'text-[#B4332E]' : '', ''],
     ['Azi', nrAzi, 'de făcut sau în lucru', '', ''],
     ['Următoarele 7 zile', nr7, 'încă deschise', '', ''],
     ['Terminate', nrTerminate, 'în ultimele 7 zile', 'text-[#1E6B43]', 'hidden sm:block'],
@@ -157,7 +171,7 @@ export default function Dashboard({ angajat, tooluri = [], onNavigate, onOpenCal
           <div className="flex flex-wrap items-start gap-6">
             <div className="min-w-0 flex-[999_1_560px]">
               {ctx ? (
-                <TaskuriMele taskuri={taskuri} filtru={filtru} setFiltru={setFiltru} ctx={ctx} onOpen={(t) => acte.deschideTask(t.id)} />
+                <TaskuriMele taskuri={taskuri} filtru={filtru} setFiltru={setFiltru} vedere={vedere} setVedere={(v) => { setVedere(v); setFiltru('Toate') }} comutator={areVedereDeschise ? [nrDeschiseAtribuite, nrDeschiseDeMine] : null} ctx={ctx} onOpen={(t) => acte.deschideTask(t.id)} />
               ) : (
                 <p className="text-sm text-[#5B6578]">Se încarcă taskurile…</p>
               )}

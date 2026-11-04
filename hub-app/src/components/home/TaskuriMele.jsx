@@ -9,19 +9,22 @@ const GRUPARE = { ordine: GRUPE, fn: grupa }
 
 function trecePrinFiltru(t, filtru, ctx) {
   if (filtru === 'Toate') return true
+  if (filtru === 'Fără responsabil') return esteDeschis(t) && !t.responsabil_id
   if (filtru === 'Noi') return !!ctx?.necitite?.[t.id]
   if (filtru === 'Terminate') return t.status === 'terminat'
   return esteDeschis(t) && grupa(t) === filtru
 }
 
-export default function TaskuriMele({ taskuri, filtru, setFiltru, ctx, onOpen }) {
+export default function TaskuriMele({ taskuri, filtru, setFiltru, ctx, onOpen, vedere = 'atribuite', setVedere, comutator = null }) {
   const [eroare, setEroare] = useState('')
   const deschise = taskuri.filter(esteDeschis)
+  const farResp = deschise.filter((t) => !t.responsabil_id).length
   const noi = taskuri.filter((t) => ctx?.necitite?.[t.id]).length
   const numara = (g) => deschise.filter((t) => grupa(t) === g).length
   const taburi = [
     ['Toate', deschise.length],
-    ...(noi > 0 || filtru === 'Noi' ? [['Noi', noi]] : []),
+    ...((noi > 0 && vedere === 'atribuite') || filtru === 'Noi' ? [['Noi', noi]] : []),
+    ...(vedere === 'deschise' && (farResp > 0 || filtru === 'Fără responsabil') ? [['Fără responsabil', farResp]] : []),
     ['Întârziate', numara('Întârziate')],
     ['Azi', numara('Azi')],
     ['Următoarele 7 zile', numara('Următoarele 7 zile')],
@@ -32,7 +35,17 @@ export default function TaskuriMele({ taskuri, filtru, setFiltru, ctx, onOpen })
   return (
     <section aria-label="Taskurile mele" className="min-w-0 overflow-hidden rounded-[14px] border border-[#E1E4EA] bg-white">
       <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-5">
-        <h2 className="text-[19px] font-extrabold">Taskurile mele</h2>
+        {comutator ? (
+          <div role="group" aria-label="Alege lista" className="inline-flex rounded-full border border-[#CBD3E0] bg-white p-[3px]">
+            {[['atribuite', 'Atribuite mie', comutator[0]], ['deschise', 'Deschise de mine', comutator[1]]].map(([k, eticheta, nr]) => (
+              <button key={k} type="button" aria-pressed={vedere === k} onClick={() => setVedere(k)} className={`min-h-[38px] rounded-full px-3.5 text-sm font-bold ${vedere === k ? 'bg-accent text-white' : 'text-accent hover:bg-[#EEF3FB]'}`}>
+                {eticheta} · {nr}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <h2 className="text-[19px] font-extrabold">Taskurile mele</h2>
+        )}
         <div className="flex flex-wrap items-center gap-2">
           {taburi.map(([nume, nr]) => (
             <button
@@ -47,7 +60,7 @@ export default function TaskuriMele({ taskuri, filtru, setFiltru, ctx, onOpen })
               {nume === 'Următoarele 7 zile' ? '7 zile' : nume} · {nr}
             </button>
           ))}
-          <ButonExport taskuri={vizibile} ctx={ctx} numeFisier="taskurile-mele" clasa="hidden sm:inline-flex !rounded-full" filtre={[['Listă', 'Taskurile mele'], ['Filtru', filtru]]} />
+          <ButonExport taskuri={vizibile} ctx={ctx} numeFisier={vedere === 'deschise' ? 'taskuri-deschise-de-mine' : 'taskurile-mele'} clasa="hidden sm:inline-flex !rounded-full" filtre={[['Listă', vedere === 'deschise' ? 'Deschise de mine' : 'Taskurile mele'], ['Filtru', filtru]]} />
         </div>
       </div>
       {eroare && <p className="px-5 pb-2 text-sm text-rose-600">{eroare}</p>}
