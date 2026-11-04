@@ -13,7 +13,7 @@ async function toate(tabel, select = '*', ord = 'id') {
 }
 
 export async function incarcaTaskuri() {
-  const [angajati, grupuri, membri, evenimente, statusuri, taskuri, colaboratori, sectiuni, itemi, acces] =
+  const [angajati, grupuri, membri, evenimente, statusuri, taskuri, colaboratori, sectiuni, itemi, acces, necitite] =
     await Promise.all([
       toate('angajati', 'id, nume_complet, activ', 'nume_complet'),
       toate('tsk_grupuri', '*', 'nume'),
@@ -25,6 +25,8 @@ export async function incarcaTaskuri() {
       toate('tsk_checklist_sectiuni', '*', 'ordine'),
       toate('tsk_checklist_itemi', '*', 'ordine'),
       supabase.rpc('tsk_angajati_cu_acces'),
+      // Nou pentru tine: RLS întoarce doar rândurile mele. Dacă migrarea 20 nu e rulată încă, lista rămâne goală.
+      supabase.from('tsk_necitite').select('task_id, motiv').then((r) => r.data || []),
     ])
   return {
     angajati,
@@ -36,6 +38,8 @@ export async function incarcaTaskuri() {
     colaboratori,
     sectiuni,
     itemi,
+    // task_id -> 'atribuit' | 'mentiune'
+    necitite: Object.fromEntries(necitite.map((r) => [r.task_id, r.motiv])),
     // angajat_id -> rol în Taskuri (lipsește dacă nu are acces)
     acces: Object.fromEntries((acces.data || []).map((r) => [r.angajat_id, r.rol])),
   }

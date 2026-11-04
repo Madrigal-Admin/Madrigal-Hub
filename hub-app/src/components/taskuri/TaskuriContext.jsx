@@ -1,3 +1,4 @@
+import { supabase } from '../../supabaseClient'
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { incarcaTaskuri } from '../../lib/taskuri/date'
 import { construiesteCtx } from '../../lib/taskuri/drepturi'
@@ -26,7 +27,20 @@ export function TaskuriProvider({ angajat, accesTooluri, children }) {
   }, [])
   useEffect(() => { reload() }, [reload])
 
-  const ctx = useMemo(() => (date ? { ...construiesteCtx(date, angajat, rol), reload } : null), [date, angajat, rol, reload])
+  // Deschiderea unui task citește eticheta Nou: o scoatem din listă imediat și din baza de date.
+  const marcheazaCitit = useCallback(
+    async (taskId) => {
+      setDate((d) => {
+        if (!d || !d.necitite[taskId]) return d
+        const { [taskId]: _scos, ...rest } = d.necitite
+        return { ...d, necitite: rest }
+      })
+      await supabase.from('tsk_necitite').delete().eq('task_id', taskId).eq('angajat_id', angajat.id)
+    },
+    [angajat.id]
+  )
+
+  const ctx = useMemo(() => (date ? { ...construiesteCtx(date, angajat, rol), reload, marcheazaCitit } : null), [date, angajat, rol, reload, marcheazaCitit])
 
   const acte = useMemo(
     () => ({

@@ -7,8 +7,9 @@ import ButonExport from '../taskuri/ButonExport'
 const GRUPARE = { ordine: GRUPE, fn: grupa }
 
 
-function trecePrinFiltru(t, filtru) {
+function trecePrinFiltru(t, filtru, ctx) {
   if (filtru === 'Toate') return true
+  if (filtru === 'Noi') return !!ctx?.necitite?.[t.id]
   if (filtru === 'Terminate') return t.status === 'terminat'
   return esteDeschis(t) && grupa(t) === filtru
 }
@@ -16,15 +17,17 @@ function trecePrinFiltru(t, filtru) {
 export default function TaskuriMele({ taskuri, filtru, setFiltru, ctx, onOpen }) {
   const [eroare, setEroare] = useState('')
   const deschise = taskuri.filter(esteDeschis)
+  const noi = taskuri.filter((t) => ctx?.necitite?.[t.id]).length
   const numara = (g) => deschise.filter((t) => grupa(t) === g).length
   const taburi = [
     ['Toate', deschise.length],
+    ...(noi > 0 || filtru === 'Noi' ? [['Noi', noi]] : []),
     ['Întârziate', numara('Întârziate')],
     ['Azi', numara('Azi')],
     ['Următoarele 7 zile', numara('Următoarele 7 zile')],
     ['Terminate', taskuri.filter((t) => t.status === 'terminat').length],
   ]
-  const vizibile = taskuri.filter((t) => trecePrinFiltru(t, filtru))
+  const vizibile = taskuri.filter((t) => trecePrinFiltru(t, filtru, ctx))
 
   return (
     <section aria-label="Taskurile mele" className="min-w-0 overflow-hidden rounded-[14px] border border-[#E1E4EA] bg-white">

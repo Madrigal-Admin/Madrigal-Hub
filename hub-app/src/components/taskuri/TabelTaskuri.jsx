@@ -1,3 +1,4 @@
+import { EtichetaNou } from './EtichetaNou'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronDown, ChevronUp, ChevronsUpDown, Columns3, Trash2 } from 'lucide-react'
 import { supabase } from '../../supabaseClient'
@@ -164,7 +165,7 @@ export default function TabelTaskuri({ taskuri, ctx, onOpen, onEroare, arataEven
         {/* telefon: card compact */}
         <div className="border-t border-[#EEF0F4] px-4 py-2 sm:hidden">
           <div className="flex items-start justify-between gap-3">
-            <button type="button" disabled={doarCitire} onClick={() => onOpen(t)} className={`text-left text-[15px] font-semibold leading-snug ${doarCitire ? 'cursor-default' : 'hover:underline'} ${inchis ? 'text-[#7A869A] line-through' : 'text-[#172036]'}`}>{t.titlu}</button>
+            <button type="button" disabled={doarCitire} onClick={() => onOpen(t)} className={`text-left text-[15px] font-semibold leading-snug ${doarCitire ? 'cursor-default' : 'hover:underline'} ${inchis ? 'text-[#7A869A] line-through' : 'text-[#172036]'}`}><EtichetaNou ctx={ctx} t={t} />{t.titlu}</button>
             <span className={`shrink-0 text-[13px] font-bold ${esteIntarziat(t) ? 'text-[#B4332E]' : 'text-[#172036]'}`}>{t.termen ? formatData(t.termen) : '—'}</span>
           </div>
           <div className="mt-1.5 flex items-center justify-between gap-2">
@@ -177,7 +178,7 @@ export default function TabelTaskuri({ taskuri, ctx, onOpen, onEroare, arataEven
           {!doarCitire && <div><input type="checkbox" className="h-4 w-4 accent-[#22406B]" checked={aleasa} onChange={() => comuta(t.id)} aria-label={`Selectează „${t.titlu}"`} /></div>}
           <div>{dd}</div>
           <div className="min-w-0">
-            <button type="button" disabled={doarCitire} onClick={() => onOpen(t)} title={t.titlu} className={`block max-w-full truncate text-left text-sm font-semibold ${doarCitire ? 'cursor-default' : 'hover:underline'} ${inchis ? 'text-[#7A869A] line-through' : 'text-[#172036]'}`}>{t.titlu}</button>
+            <button type="button" disabled={doarCitire} onClick={() => onOpen(t)} title={t.titlu} className={`block max-w-full truncate text-left text-sm font-semibold ${doarCitire ? 'cursor-default' : 'hover:underline'} ${inchis ? 'text-[#7A869A] line-through' : 'text-[#172036]'}`}><EtichetaNou ctx={ctx} t={t} />{t.titlu}</button>
             <span className="mt-0.5 flex min-w-0 flex-wrap gap-1 empty:hidden"><Eticheta t={t} ctx={ctx} arataEveniment={arataEveniment} arataTag={!coloane.tag && !coloaneFixe} /></span>
           </div>
           {vizibile.map((k) => (

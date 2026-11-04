@@ -7,6 +7,7 @@ import { Modal } from './Mici'
 import StatusDropdown from './StatusDropdown'
 import CelulaEditabila from './CelulaEditabila'
 import AngajatiPicker from './AngajatiPicker'
+import { CampComentariu, IstoricTask, TextComentariu, mentiuniRamase } from './Mentiuni'
 
 // Descriere: text pe mai multe rânduri, editabil la click, se salvează când ieși din câmp.
 function Descriere({ task, ctx, poate, onEroare }) {
@@ -37,12 +38,16 @@ export default function TaskDetaliu({ taskId, ctx, onClose }) {
   const [text, setText] = useState('')
   const [eroare, setEroare] = useState('')
   const [busy, setBusy] = useState(false)
+  const [mentiuni, setMentiuni] = useState([])
 
   async function incarcaComentarii() {
     const { data } = await supabase.from('tsk_comentarii').select('*').eq('task_id', taskId).order('created_at')
     setComentarii(data || [])
   }
   useEffect(() => { incarcaComentarii() }, [taskId]) // eslint-disable-line react-hooks/exhaustive-deps
+  // deschiderea taskului scoate eticheta Nou / Menționat
+  const esteNou = !!ctx.necitite?.[taskId]
+  useEffect(() => { if (esteNou) ctx.marcheazaCitit(taskId) }, [taskId, esteNou]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!task) {
     return (
@@ -86,10 +91,11 @@ export default function TaskDetaliu({ taskId, ctx, onClose }) {
     e.preventDefault()
     if (!text.trim()) return
     setBusy(true)
-    const { error } = await supabase.from('tsk_comentarii').insert({ task_id: task.id, autor_id: ctx.me.id, text: text.trim() })
+    const { error } = await supabase.from('tsk_comentarii').insert({ task_id: task.id, autor_id: ctx.me.id, text: text.trim(), ...(mentiuniRamase(ctx, text, mentiuni).length ? { mentiuni: mentiuniRamase(ctx, text, mentiuni) } : {}) })
     setBusy(false)
     if (error) return setEroare(mesajEroare(error, 'Nu am putut trimite comentariul.'))
     setText('')
+    setMentiuni([])
     incarcaComentarii()
   }
 
@@ -170,17 +176,18 @@ export default function TaskDetaliu({ taskId, ctx, onClose }) {
                   <button type="button" onClick={() => stergeComentariu(c.id)} className="text-slate-400 hover:text-rose-600" title="Șterge comentariul">✕</button>
                 )}
               </div>
-              <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800">{c.text}</p>
+              <p className="mt-1 whitespace-pre-wrap text-sm text-slate-800"><TextComentariu ctx={ctx} c={c} /></p>
             </li>
           ))}
           {comentarii.length === 0 && <li className="text-sm text-slate-400">Niciun comentariu încă.</li>}
         </ul>
         <form onSubmit={trimite} className="flex gap-2">
-          <input className={inputCls} placeholder="Scrie un comentariu…" maxLength={2000} value={text} onChange={(e) => setText(e.target.value)} />
+          <CampComentariu ctx={ctx} task={task} text={text} setText={setText} mentiuni={mentiuni} setMentiuni={setMentiuni} />
           <button type="submit" disabled={busy || !text.trim()} className="shrink-0 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50">
             Trimite
           </button>
         </form>
+        <IstoricTask ctx={ctx} task={task} />
       </div>
     </Modal>
   )
