@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import FiltruAngajati, { FILTRU_GOL, potrivesteFiltru } from './FiltruAngajati'
 
-// Rolurile posibile per tool. '' înseamnă "fără acces".
+// Rolurile posibile per tool. '' înseamnă "fără acces" (la Invitații: „Angajat”, rolul implicit al oricărui angajat).
 const TOOLS = [
   { key: 'hub', label: 'Hub', roles: ['admin'] },
   { key: 'hr', label: 'HR', roles: ['angajat', 'operational', 'full'] },
@@ -33,7 +33,7 @@ const ROLE_LABELS = {
 }
 
 // Același cod de rol poate avea nume diferit la tool-uri diferite.
-const ROLE_LABELS_TOOL = { 'taskuri:admin': 'Admin taskuri', 'hub:admin': 'Admin Hub', 'calendar:admin': 'Admin calendar' }
+const ROLE_LABELS_TOOL = { 'invitatii:full': 'Admin general', 'invitatii:checkin': 'Verificare la intrare', 'taskuri:admin': 'Admin taskuri', 'hub:admin': 'Admin Hub', 'calendar:admin': 'Admin calendar' }
 const labelRol = (tool, r) => ROLE_LABELS_TOOL[`${tool}:${r}`] || ROLE_LABELS[r]
 
 export default function AdminAccesTooluri() {
@@ -113,7 +113,7 @@ export default function AdminAccesTooluri() {
     const ids = [...selectati]
     if (ids.length === 0) return
     const tool = TOOLS.find((t) => t.key === bulkTool)
-    const eticheta = bulkRol === '' ? 'FĂRĂ ACCES' : labelRol(bulkTool, bulkRol)
+    const eticheta = bulkRol === '' ? (bulkTool === 'invitatii' ? 'ANGAJAT (implicit)' : 'FĂRĂ ACCES') : labelRol(bulkTool, bulkRol)
     if (!window.confirm(`Setezi „${eticheta}" la ${tool.label} pentru ${ids.length} persoane? Accesul lor actual la ${tool.label} se înlocuiește.`)) return
     setBulkBusy(true)
     setBulkMesaj('')
@@ -173,7 +173,7 @@ export default function AdminAccesTooluri() {
           </select>
           <span className="text-slate-500">cu rolul</span>
           <select value={bulkRol} onChange={(e) => setBulkRol(e.target.value)} className="rounded-lg border border-slate-300 bg-white px-2 py-1.5">
-            <option value="">Fără acces (elimină)</option>
+            <option value="">{bulkTool === 'invitatii' ? 'Angajat (implicit, elimină rolul)' : 'Fără acces (elimină)'}</option>
             {TOOLS.find((t) => t.key === bulkTool).roles.map((r) => (
               <option key={r} value={r}>{labelRol(bulkTool, r)}</option>
             ))}
@@ -231,7 +231,7 @@ export default function AdminAccesTooluri() {
                         onChange={(e) => handleChange(a.id, t.key, e.target.value)}
                         className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-accent disabled:opacity-50"
                       >
-                        <option value="">Fără acces</option>
+                        <option value="">{t.key === 'invitatii' ? 'Angajat (implicit)' : 'Fără acces'}</option>
                         {t.roles.map((r) => (
                           <option key={r} value={r}>
                             {labelRol(t.key, r)}

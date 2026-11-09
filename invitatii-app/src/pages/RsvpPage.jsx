@@ -1,10 +1,19 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { PublicLayout } from './PublicLayout'
+import { formatData } from '../lib/format'
 
-function formatData(dataStr) {
-  if (!dataStr) return '—'
-  return new Date(dataStr).toLocaleDateString('ro-RO', { day: 'numeric', month: 'long', year: 'numeric' })
+// Înlocuiește {{nume}}, {{prenume}}, {{nume_familie}}, {{institutie}}, {{functie}} exact ca în email;
+// câmpurile necunoscute rămân neschimbate
+function personalizeaza(text, info) {
+  const valori = {
+    nume: info.nume_invitat || '',
+    prenume: info.prenume || '',
+    nume_familie: info.nume_familie || '',
+    institutie: info.institutie || '',
+    functie: info.functie || '',
+  }
+  return (text || '').replace(/\{\{\s*(\w+)\s*\}\}/g, (m, k) => (k in valori ? valori[k] : m))
 }
 
 export default function RsvpPage({ token }) {
@@ -12,6 +21,7 @@ export default function RsvpPage({ token }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
+  const [eroareRaspuns, setEroareRaspuns] = useState('')
 
   useEffect(() => {
     load()
@@ -30,7 +40,9 @@ export default function RsvpPage({ token }) {
 
   async function raspunde(raspuns) {
     setSaving(true)
-    await supabase.rpc('rsvp_raspunde', { p_token: token, p_raspuns: raspuns })
+    setEroareRaspuns('')
+    const { error } = await supabase.rpc('rsvp_raspunde', { p_token: token, p_raspuns: raspuns })
+    if (error) setEroareRaspuns('Răspunsul nu a putut fi salvat. Evenimentul s-ar putea să fi fost închis sau anulat.')
     await load()
     setSaving(false)
   }
@@ -49,6 +61,19 @@ export default function RsvpPage({ token }) {
     )
   }
 
+  if (info.inchis) {
+    return (
+      <PublicLayout>
+        <div className="bg-white rounded-2xl shadow-sm p-6 text-center">
+          <h2 className="font-display text-xl font-semibold text-slate-800">{info.nume_eveniment}</h2>
+          <p className="mt-4 text-sm text-slate-600">
+            Evenimentul s-a încheiat, deci răspunsurile nu se mai primesc. Îți mulțumim!
+          </p>
+        </div>
+      </PublicLayout>
+    )
+  }
+
   return (
     <PublicLayout>
       <div className="bg-white rounded-2xl shadow-sm p-6 text-center">
@@ -62,10 +87,13 @@ export default function RsvpPage({ token }) {
           {info.locatie ? ` · ${info.locatie}` : ''}
         </p>
 
-        <p className="mt-4 text-sm text-slate-600">
-          Bună, <strong>{info.nume_invitat}</strong>!
-          {info.mesaj_intro ? ` ${info.mesaj_intro.replace(/\{\{\s*nume\s*\}\}/g, info.nume_invitat).replace(/\{\{\s*\w+\s*\}\}/g, '')}` : ''}
-        </p>
+        {info.mesaj_intro ? (
+          <p className="mt-4 whitespace-pre-line text-sm text-slate-600">{personalizeaza(info.mesaj_intro, info)}</p>
+        ) : (
+          <p className="mt-4 text-sm text-slate-600">
+            Bună, <strong>{info.nume_invitat}</strong>!
+          </p>
+        )}
 
         <div className="mt-6 flex justify-center gap-3">
           <button
@@ -91,6 +119,8 @@ export default function RsvpPage({ token }) {
             Nu pot participa
           </button>
         </div>
+
+        {eroareRaspuns && <p className="mt-3 text-xs text-rose-600">{eroareRaspuns}</p>}
 
         {info.status_rsvp !== 'in_asteptare' && (
           <p className="mt-3 text-xs text-slate-400">

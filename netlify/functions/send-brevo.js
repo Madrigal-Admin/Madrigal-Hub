@@ -12,7 +12,10 @@
 //
 // Parametri (JSON): eveniment_id (obligatoriu), reseteaza_erori (opțional):
 // șterge erorile anterioare ale evenimentului, ca invitațiile eșuate să fie
-// reîncercate în acest ciclu.
+// reîncercate în acest ciclu; test (opțional, true): trimite UN singur email de probă,
+// doar la adresa contului adminului, fără să schimbe statusul nimănui.
+//
+// Un eveniment închis sau anulat nu mai trimite invitații.
 //
 // Variabile de mediu necesare (setate în Netlify, fără prefix VITE_):
 //   BREVO_API_KEY, BREVO_SENDER_EMAIL, BREVO_SENDER_NAME (opțional),
@@ -66,10 +69,12 @@ export async function handler(event) {
 
   let evenimentId
   let reseteazaErori = false
+  let test = false
   try {
     const body = JSON.parse(event.body || '{}')
     evenimentId = body.eveniment_id
     reseteazaErori = body.reseteaza_erori === true
+    test = body.test === true
   } catch {
     return json(400, { error: 'Corp de cerere invalid.' })
   }
@@ -94,7 +99,7 @@ export async function handler(event) {
 
   // 2. Evenimentul + conținutul lui
   const evRes = await fetch(
-    `${SUPABASE_URL}/rest/v1/evenimente?id=eq.${evenimentId}&select=nume,data,locatie,status,invitatii_profil_eveniment(subiect_email,mesaj_intro,afis_url)`,
+    `${SUPABASE_URL}/rest/v1/evenimente?id=eq.${evenimentId}&select=nume,data,locatie,status,invitatii_profil_eveniment(subiect_email,mesaj_intro,afis_url,inchis_la)`,
     { headers: sb }
   )
   const [eveniment] = await evRes.json()
@@ -118,6 +123,72 @@ export async function handler(event) {
     return json(400, { error: 'Completează subiectul emailului înainte de a trimite.' })
   }
 
+  // Un eveniment închis de Admin nu mai trimite invitații (emailul de test rămâne permis)
+  if (profil.inchis_la && !test) {
+    return json(400, { error: 'Evenimentul este închis. Redeschide-l ca să poți trimite invitații.' })
+  }
+
+  // Corpul emailului, același pentru invitații reale și pentru testul adminului
+  function construiesteEmail(valori, rsvpLink, dezabonareLink, notaTest) {
+    const mesaj = esc(inlocuieste(profil.mesaj_intro, valori))
+    return {
+      subiect: inlocuieste(profil.subiect_email, valori),
+      html: `
+      <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+        ${notaTest ? `<p style="background:#fef3c7;color:#92400e;padding:10px 12px;border-radius:8px;font-size:12px;">${esc(notaTest)}</p>` : ''}
+        ${profil.afis_url ? `<img src="${esc(profil.afis_url)}" alt="" style="width:100%; border-radius: 12px; margin-bottom: 16px;" />` : ''}
+        <h2 style="margin-bottom: 4px;">${esc(eveniment.nume)}</h2>
+        <p style="color: #64748b; margin-top: 0;">${esc(formatData(eveniment.data))}${eveniment.locatie ? ` · ${esc(eveniment.locatie)}` : ''}</p>
+        <p style="white-space: pre-line;">${mesaj}</p>
+        <p style="margin-top: 24px;">
+          <a href="${rsvpLink}" style="background:#22406B;color:#fff;padding:12px 20px;border-radius:999px;text-decoration:none;font-weight:600;">
+            Răspunde la invitație
+          </a>
+        </p>
+        <p style="margin-top: 32px; font-size: 12px; color: #94a3b8;">
+          Primești acest mesaj ca invitat al Corului Madrigal.
+          <a href="${dezabonareLink}" style="color: #94a3b8;">Nu mai doresc invitații</a>
+        </p>
+      </div>
+    `,
+    }
+  }
+
+  async function trimiteBrevo(destinatar, nume, subiect, htmlContent, dezabonareLink) {
+    return fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        sender: { name: BREVO_SENDER_NAME || 'Corul Madrigal', email: BREVO_SENDER_EMAIL },
+        to: [{ email: destinatar, name: nume }],
+        subject: subiect,
+        htmlContent,
+        headers: { 'List-Unsubscribe': `<${dezabonareLink}>` },
+      }),
+    })
+  }
+
+  // Emailul de test: UN singur mesaj, către adresa contului adminului; nu atinge nicio invitație
+  if (test) {
+    if (!user.email) return json(400, { error: 'Contul tău nu are o adresă de email.' })
+    const numeAdmin = user.email
+    const valori = { nume: numeAdmin, prenume: numeAdmin, nume_familie: '', institutie: '', functie: '' }
+    const dezabonareLink = `${SITE_URL}/invitatii/?dezabonare=test`
+    const { subiect, html } = construiesteEmail(
+      valori,
+      `${SITE_URL}/invitatii/`,
+      dezabonareLink,
+      'EMAIL DE TEST: câmpurile sunt completate cu adresa ta, iar linkurile nu sunt active pentru un invitat real.'
+    )
+    try {
+      const r = await trimiteBrevo(user.email, numeAdmin, `[TEST] ${subiect}`, html, dezabonareLink)
+      if (!r.ok) return json(502, { error: `Brevo a refuzat emailul de test (${r.status}).` })
+    } catch (e) {
+      return json(502, { error: `Nu am putut contacta Brevo: ${e.message}` })
+    }
+    return json(200, { ok: true, test: true, adresa: user.email })
+  }
+
   // Număra rânduri dintr-un filtru PostgREST (fără a le descărca)
   // (filtrele pe `persoane.*` cer ca `persoane` să fie inclusă în select)
   async function numara(filtru, select = 'id') {
@@ -128,8 +199,8 @@ export async function handler(event) {
     return Number(total) || 0
   }
 
-  const baza = `eveniment_id=eq.${evenimentId}&status_rsvp=eq.in_asteptare&trimis_la=is.null`
-  // „Eligibil" = netrimis, fără eroare, persoană abonată (inner join exclude nominalizații fără persoană)
+  const baza = `eveniment_id=eq.${evenimentId}&sursa=eq.trimitere&status_rsvp=eq.in_asteptare&trimis_la=is.null`
+  // „Eligibil" = netrimis, fără eroare, persoană abonată (inner join exclude invitații fără persoană)
   const eligibil = `${baza}&eroare_trimitere=is.null&persoane.abonat_invitatii=eq.true`
   const selectEligibil = 'id,token,persoane!inner(nume,prenume,email,institutie,functie)'
   const selectNumarare = 'id,persoane!inner(id)'
@@ -173,39 +244,10 @@ export async function handler(event) {
       institutie: p.institutie || '',
       functie: p.functie || '',
     }
-    const mesaj = esc(inlocuieste(profil.mesaj_intro, valori))
-    const subiect = inlocuieste(profil.subiect_email, valori)
-
-    const htmlContent = `
-      <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
-        ${profil.afis_url ? `<img src="${esc(profil.afis_url)}" alt="" style="width:100%; border-radius: 12px; margin-bottom: 16px;" />` : ''}
-        <h2 style="margin-bottom: 4px;">${esc(eveniment.nume)}</h2>
-        <p style="color: #64748b; margin-top: 0;">${esc(formatData(eveniment.data))}${eveniment.locatie ? ` · ${esc(eveniment.locatie)}` : ''}</p>
-        <p style="white-space: pre-line;">${mesaj}</p>
-        <p style="margin-top: 24px;">
-          <a href="${rsvpLink}" style="background:#22406B;color:#fff;padding:12px 20px;border-radius:999px;text-decoration:none;font-weight:600;">
-            Răspunde la invitație
-          </a>
-        </p>
-        <p style="margin-top: 32px; font-size: 12px; color: #94a3b8;">
-          Primești acest mesaj ca invitat al Corului Madrigal.
-          <a href="${dezabonareLink}" style="color: #94a3b8;">Nu mai doresc invitații</a>
-        </p>
-      </div>
-    `
+    const { subiect, html } = construiesteEmail(valori, rsvpLink, dezabonareLink)
 
     try {
-      const r = await fetch('https://api.brevo.com/v3/smtp/email', {
-        method: 'POST',
-        headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json', Accept: 'application/json' },
-        body: JSON.stringify({
-          sender: { name: BREVO_SENDER_NAME || 'Corul Madrigal', email: BREVO_SENDER_EMAIL },
-          to: [{ email: p.email, name: nume }],
-          subject: subiect,
-          htmlContent,
-          headers: { 'List-Unsubscribe': `<${dezabonareLink}>` },
-        }),
-      })
+      const r = await trimiteBrevo(p.email, nume, subiect, html, dezabonareLink)
       if (r.ok) return { ok: true }
       const detaliu = await r.text()
       // Limita zilnică/de ritm a contului Brevo: nu marcăm persoana ca eșuată, oprim lotul

@@ -17,7 +17,8 @@ export function construiesteTooluri(accesTooluri = []) {
   return [
     { key: 'calendar', label: 'Calendar', icon: 'calendar', href: '/?view=calendar', view: 'calendar' },
     are('hr') && { key: 'hr', label: 'Resurse Umane', icon: 'users', href: '/HR/' },
-    are('invitatii') && { key: 'invitatii', label: 'Invitații & RSVP', icon: 'mail', href: '/invitatii/' },
+    // Invitații: vizibil pentru orice angajat (fără rol = „Angajat”, poate doar să solicite invitații)
+    { key: 'invitatii', label: 'Invitații & RSVP', icon: 'mail', href: '/invitatii/' },
     are('administrativ') && { key: 'administrativ', label: 'Administrativ', icon: 'package', href: '/administrativ/' },
     are('rapoarte') && { key: 'rapoarte', label: 'Rapoarte', icon: 'file', href: '/rapoarte/' },
     are('financiar') && { key: 'financiar', label: 'Financiar', icon: 'receipt', href: '/financiar/' },

@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react'
 import Papa from 'papaparse'
 import { Pencil, Trash2, Save, X as XIcon, Upload, Plus } from 'lucide-react'
 import { supabase } from '../supabaseClient'
-
-export const CATEGORII = ['Autoritate Publică', 'Sponsor', 'Colaborator', 'Presă', 'Prieteni/Familie']
+import { fetchAll } from '../lib/fetchAll'
+import { useCategorii } from '../lib/useCategorii'
+import { PageHeader } from './ui'
 
 const EMPTY_FORM = {
   nume: '',
@@ -16,6 +17,7 @@ const EMPTY_FORM = {
 }
 
 export default function PersoaneTab() {
+  const { toate: categoriiToate, active: categoriiActive, reincarca: reincarcaCategorii } = useCategorii()
   const [persoane, setPersoane] = useState([])
   const [istoricMap, setIstoricMap] = useState({})
   const [loading, setLoading] = useState(true)
@@ -35,8 +37,8 @@ export default function PersoaneTab() {
   async function load() {
     setLoading(true)
     const [{ data }, { data: invitatiiRows }] = await Promise.all([
-      supabase.from('persoane').select('*').order('nume'),
-      supabase.from('invitatii').select('persoana_id, prezent'),
+      fetchAll((a, b) => supabase.from('persoane').select('*').order('nume').order('id').range(a, b)),
+      fetchAll((a, b) => supabase.from('invitatii').select('id, persoana_id, prezent').not('persoana_id', 'is', null).order('id').range(a, b)),
     ])
 
     const map = {}
@@ -120,15 +122,17 @@ export default function PersoaneTab() {
 
   return (
     <div>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold text-slate-800">Persoane</h2>
+      <PageHeader
+        titlu="Persoane"
+        descriere="Lista fixă de invitați, împărțită pe categorii. Categoriile se editează din Setări."
+      >
         <button
           onClick={() => setShowImport(true)}
-          className="flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-200"
+          className="flex items-center gap-1.5 rounded-full border border-slate-300 bg-white px-4 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50"
         >
           <Upload size={13} /> Importă CSV
         </button>
-      </div>
+      </PageHeader>
 
       <form
         onSubmit={handleSubmit}
@@ -170,11 +174,14 @@ export default function PersoaneTab() {
             className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent bg-white"
           >
             <option value="">— Alege categorie —</option>
-            {CATEGORII.map((c) => (
-              <option key={c} value={c}>
-                {c}
+            {categoriiActive.map((c) => (
+              <option key={c.id} value={c.nume}>
+                {c.nume}
               </option>
             ))}
+            {form.categorie && !categoriiActive.some((c) => c.nume === form.categorie) && (
+              <option value={form.categorie}>{form.categorie} (arhivată)</option>
+            )}
           </select>
         </div>
         <div>
@@ -239,9 +246,10 @@ export default function PersoaneTab() {
           className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
         >
           <option value="">Toate categoriile</option>
-          {CATEGORII.map((c) => (
-            <option key={c} value={c}>
-              {c}
+          {categoriiToate.map((c) => (
+            <option key={c.id} value={c.nume}>
+              {c.nume}
+              {c.arhivata ? ' (arhivată)' : ''}
             </option>
           ))}
         </select>
@@ -317,7 +325,16 @@ export default function PersoaneTab() {
         </div>
       )}
 
-      {showImport && <ImportCsvModal onClose={() => setShowImport(false)} onImported={load} />}
+      {showImport && (
+        <ImportCsvModal
+          categoriiActive={categoriiActive}
+          onClose={() => setShowImport(false)}
+          onImported={() => {
+            load()
+            reincarcaCategorii()
+          }}
+        />
+      )}
       {istoricPersoana && (
         <IstoricModal persoana={istoricPersoana} onClose={() => setIstoricPersoana(null)} />
       )}
@@ -402,7 +419,7 @@ const RSVP_LABELS = {
 
 const CSV_COLOANE = ['nume', 'prenume', 'email', 'institutie', 'functie', 'categorie']
 
-function ImportCsvModal({ onClose, onImported }) {
+function ImportCsvModal({ categoriiActive, onClose, onImported }) {
   const [rows, setRows] = useState([])
   const [fileName, setFileName] = useState('')
   const [parseError, setParseError] = useState('')
@@ -435,6 +452,16 @@ function ImportCsvModal({ onClose, onImported }) {
   }
 
   async function handleImport() {
+    // Categoriile din fișier trebuie să existe deja (se gestionează din Setări), ca să nu apară duplicate din greșeli de scriere
+    const permise = new Set(categoriiActive.map((c) => c.nume))
+    const necunoscute = [...new Set(rows.map((r) => r.categorie?.trim()).filter((c) => c && !permise.has(c)))]
+    if (necunoscute.length > 0) {
+      setParseError(
+        `Categorii necunoscute în fișier: ${necunoscute.join(', ')}. Corectează fișierul sau adaugă categoriile în Setări, apoi importă din nou. Nu s-a importat nimic.`
+      )
+      return
+    }
+    setParseError('')
     setImporting(true)
     const payload = rows.map((r) => ({
       nume: r.nume?.trim(),
@@ -446,7 +473,10 @@ function ImportCsvModal({ onClose, onImported }) {
       abonat_invitatii: true,
     }))
 
-    const { error } = await supabase.from('persoane').upsert(payload, { onConflict: 'email' })
+    let error = null
+    for (let i = 0; i < payload.length && !error; i += 500) {
+      ;({ error } = await supabase.from('persoane').upsert(payload.slice(i, i + 500), { onConflict: 'email' }))
+    }
     setImporting(false)
 
     if (error) {
@@ -469,7 +499,7 @@ function ImportCsvModal({ onClose, onImported }) {
 
         <p className="text-xs text-slate-500 mb-3">
           Coloane necesare: <code>nume, prenume, email</code> (obligatorii), plus opțional{' '}
-          <code>institutie, functie, categorie</code>. Persoanele cu email deja existent se actualizează, nu se
+          <code>institutie, functie, categorie</code> (categoria trebuie să existe în Setări). Persoanele cu email deja existent se actualizează, nu se
           duplică.
         </p>
 

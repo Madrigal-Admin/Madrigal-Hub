@@ -1,18 +1,16 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Check, Link as LinkIcon } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Check } from 'lucide-react'
 import { supabase } from '../supabaseClient'
+import { azi, formatData, mesajEroare, profilul } from '../lib/format'
+import { Pill, PageHeader } from './ui'
 
 const RSVP_BADGE = {
-  confirmat: { label: 'Confirmat', className: 'bg-green-50 text-green-700' },
-  refuzat: { label: 'Refuzat', className: 'bg-rose-50 text-rose-600' },
-  in_asteptare: { label: 'În așteptare', className: 'bg-amber-50 text-amber-700' },
+  confirmat: { label: 'Confirmat', culoare: 'verde' },
+  refuzat: { label: 'Refuzat', culoare: 'rosu' },
+  in_asteptare: { label: 'În așteptare', culoare: 'galben' },
 }
 
-function formatData(dataStr) {
-  if (!dataStr) return '—'
-  return new Date(dataStr).toLocaleDateString('ro-RO', { day: 'numeric', month: 'long', year: 'numeric' })
-}
-
+// Check-in: doar evenimentele în desfășurare (data a sosit) care nu au fost închise de Admin
 export default function CheckinTab() {
   const [evenimente, setEvenimente] = useState([])
   const [evenimentId, setEvenimentId] = useState('')
@@ -21,197 +19,179 @@ export default function CheckinTab() {
   const [sortare, setSortare] = useState('nume')
   const [loading, setLoading] = useState(true)
   const [busyId, setBusyId] = useState(null)
-  const [copiat, setCopiat] = useState(null)
+  const [eroare, setEroare] = useState('')
 
   useEffect(() => {
+    async function loadEvenimente() {
+      const { data } = await supabase
+        .from('evenimente')
+        .select('id, nume, data, invitatii_profil_eveniment(inchis_la)')
+        .eq('necesita_rsvp', true)
+        .lte('data', azi())
+        .order('data', { ascending: false })
+
+      const lista = (data || []).filter((e) => !profilul(e)?.inchis_la)
+      setEvenimente(lista)
+      setEvenimentId(lista[0]?.id || '')
+      if (lista.length === 0) setLoading(false)
+    }
     loadEvenimente()
+  }, [])
+
+  const loadInvitatii = useCallback(async (id) => {
+    setLoading(true)
+    const { data, error } = await supabase.rpc('checkin_invitati', { p_eveniment_id: id })
+    if (error) setEroare(mesajEroare(error))
+    setInvitatii(data || [])
+    setLoading(false)
   }, [])
 
   useEffect(() => {
     if (evenimentId) loadInvitatii(evenimentId)
-  }, [evenimentId])
-
-  async function loadEvenimente() {
-    const { data } = await supabase
-      .from('evenimente')
-      .select('id, nume, data')
-      .eq('necesita_rsvp', true)
-      .order('data', { ascending: false })
-
-    const lista = data || []
-    setEvenimente(lista)
-
-    const azi = new Date().toISOString().slice(0, 10)
-    const viitor = [...lista].reverse().find((e) => e.data >= azi)
-    setEvenimentId(viitor?.id || lista[0]?.id || '')
-    setLoading(false)
-  }
-
-  async function loadInvitatii(id) {
-    setLoading(true)
-    const { data } = await supabase
-      .from('invitatii')
-      .select('*, persoane(nume, prenume, email, categorie)')
-      .eq('eveniment_id', id)
-    setInvitatii(data || [])
-    setLoading(false)
-  }
-
-  async function copiazaLink(inv) {
-    const link = `${window.location.origin}/invitatii/?rsvp=${inv.token}`
-    try {
-      await navigator.clipboard.writeText(link)
-      setCopiat(inv.id)
-      setTimeout(() => setCopiat(null), 1800)
-    } catch {
-      window.prompt('Copiază linkul RSVP:', link)
-    }
-  }
+  }, [evenimentId, loadInvitatii])
 
   async function toggleCheckin(inv) {
     setBusyId(inv.id)
+    setEroare('')
     const nouaValoare = !inv.prezent
-    await supabase
+    const { error } = await supabase
       .from('invitatii')
       .update({ prezent: nouaValoare, data_checkin: nouaValoare ? new Date().toISOString() : null })
       .eq('id', inv.id)
-
-    setInvitatii((prev) =>
-      prev.map((i) => (i.id === inv.id ? { ...i, prezent: nouaValoare } : i))
-    )
     setBusyId(null)
+    if (error) {
+      setEroare(mesajEroare(error))
+      return
+    }
+    setInvitatii((prev) => prev.map((i) => (i.id === inv.id ? { ...i, prezent: nouaValoare } : i)))
   }
 
   const filtrate = useMemo(() => {
-    const q = cautare.toLowerCase()
-    let lista = invitatii.filter((i) => {
-      if (!q) return true
-      const numeComplet = i.persoane ? `${i.persoane.prenume} ${i.persoane.nume}` : i.nume_complet_invitat || ''
-      return numeComplet.toLowerCase().includes(q) || i.persoane?.email?.toLowerCase().includes(q)
-    })
-
-    lista = [...lista].sort((a, b) => {
-      if (sortare === 'categorie') {
-        return (a.persoane?.categorie || '').localeCompare(b.persoane?.categorie || '')
-      }
-      const numeA = a.persoane ? `${a.persoane.prenume} ${a.persoane.nume}` : a.nume_complet_invitat || ''
-      const numeB = b.persoane ? `${b.persoane.prenume} ${b.persoane.nume}` : b.nume_complet_invitat || ''
-      return numeA.localeCompare(numeB)
-    })
-
-    return lista
+    const q = cautare.trim().toLowerCase()
+    const lista = invitatii.filter((i) => !q || (i.nume || '').toLowerCase().includes(q))
+    return [...lista].sort((a, b) =>
+      sortare === 'categorie'
+        ? (a.categorie || '').localeCompare(b.categorie || '', 'ro') || (a.nume || '').localeCompare(b.nume || '', 'ro')
+        : (a.nume || '').localeCompare(b.nume || '', 'ro')
+    )
   }, [invitatii, cautare, sortare])
 
   const prezenti = invitatii.filter((i) => i.prezent).length
-  const confirmati = invitatii.filter((i) => i.status_rsvp === 'confirmat').length
-  const inAsteptare = invitatii.filter((i) => i.status_rsvp === 'in_asteptare').length
-  const refuzati = invitatii.filter((i) => i.status_rsvp === 'refuzat').length
+  const lista = invitatii.filter((i) => i.sursa === 'trimitere')
+  const confirmati = lista.filter((i) => i.status_rsvp === 'confirmat').length
+  const inAsteptare = lista.filter((i) => i.status_rsvp === 'in_asteptare').length
+  const refuzati = lista.filter((i) => i.status_rsvp === 'refuzat').length
+  const angajati = invitatii.filter((i) => i.sursa === 'solicitare').length
 
   return (
     <div>
-      <div className="mb-4 flex flex-wrap items-end gap-3">
-        <div>
-          <label className="mb-1 block text-xs font-medium text-slate-600">Eveniment</label>
-          <select
-            value={evenimentId}
-            onChange={(e) => setEvenimentId(e.target.value)}
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
-          >
-            {evenimente.map((e) => (
-              <option key={e.id} value={e.id}>
-                {e.nume} — {formatData(e.data)}
-              </option>
-            ))}
-          </select>
-        </div>
+      <PageHeader
+        titlu="Check-in"
+        descriere="Evenimentele în desfășurare: data a sosit și nu au fost închise de un administrator. Bifezi persoanele pe măsură ce intră."
+      />
 
-        {evenimentId && (
-          <>
+      {evenimente.length === 0 ? (
+        !loading && (
+          <p className="rounded-2xl bg-white p-5 text-sm text-slate-500 shadow-sm">
+            Niciun eveniment în desfășurare. Check-in-ul e disponibil din ziua evenimentului, până când un
+            administrator îl închide.
+          </p>
+        )
+      ) : (
+        <>
+          <div className="mb-4 flex flex-wrap items-end gap-3">
+            <div>
+              <label htmlFor="ev-checkin" className="mb-1 block text-xs font-bold text-slate-600">Eveniment</label>
+              <select
+                id="ev-checkin"
+                value={evenimentId}
+                onChange={(e) => setEvenimentId(e.target.value)}
+                className="min-w-[260px] rounded-[10px] border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+              >
+                {evenimente.map((e) => (
+                  <option key={e.id} value={e.id}>{e.nume} — {formatData(e.data)}</option>
+                ))}
+              </select>
+            </div>
             <input
               value={cautare}
               onChange={(e) => setCautare(e.target.value)}
-              placeholder="Caută persoană..."
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+              placeholder="Caută persoană…"
+              aria-label="Caută persoană"
+              className="rounded-[10px] border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
             />
             <div>
-              <label className="mb-1 block text-xs font-medium text-slate-600">Sortează după</label>
+              <label htmlFor="sort-checkin" className="mb-1 block text-xs font-bold text-slate-600">Sortează după</label>
               <select
+                id="sort-checkin"
                 value={sortare}
                 onChange={(e) => setSortare(e.target.value)}
-                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+                className="rounded-[10px] border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
               >
                 <option value="nume">Nume</option>
                 <option value="categorie">Categorie</option>
               </select>
             </div>
-          </>
-        )}
-      </div>
-
-      {evenimentId && (
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-accent p-5 text-white">
-          <div>
-            <p className="text-xs uppercase tracking-wide text-white/70">Prezenți la intrare</p>
-            <p className="font-display text-3xl font-bold">
-              {prezenti} <span className="text-lg font-normal text-white/70">/ {invitatii.length} invitați</span>
-            </p>
           </div>
-          <div className="text-sm text-white/90">
-            <p>{confirmati} confirmați</p>
-            <p>{inAsteptare} în așteptare</p>
-            <p>{refuzati} refuzați</p>
-          </div>
-        </div>
-      )}
 
-      {loading ? (
-        <p className="text-sm text-slate-500">Se încarcă...</p>
-      ) : !evenimentId ? (
-        <p className="text-sm text-slate-400">Niciun eveniment cu RSVP activ.</p>
-      ) : (
-        <div className="space-y-1.5">
-          {filtrate.map((inv) => {
-            const nume = inv.persoane ? `${inv.persoane.prenume} ${inv.persoane.nume}` : inv.nume_complet_invitat
-            const badge = RSVP_BADGE[inv.status_rsvp] || RSVP_BADGE.in_asteptare
-            return (
-              <div key={inv.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4">
-                <div className="min-w-0">
-                  <p className="font-medium text-slate-800">{nume || 'Fără nume'}</p>
-                  <div className="mt-1 flex flex-wrap gap-1.5">
-                    {inv.persoane?.categorie && (
-                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
-                        {inv.persoane.categorie}
-                      </span>
-                    )}
-                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${badge.className}`}>{badge.label}</span>
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-4 rounded-2xl bg-accent p-5 text-white">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-white/70">Prezenți la intrare</p>
+              <p className="text-3xl font-extrabold">
+                {prezenti} <span className="text-lg font-normal text-white/70">/ {invitatii.length} invitați</span>
+              </p>
+            </div>
+            <div className="text-sm text-white/90">
+              <p>{confirmati} confirmați</p>
+              <p>{inAsteptare} în așteptare</p>
+              <p>{refuzati} refuzați</p>
+              <p>{angajati} invitați ai angajaților</p>
+            </div>
+          </div>
+
+          {eroare && <p className="mb-3 text-sm text-rose-600">{eroare}</p>}
+
+          {loading ? (
+            <p className="text-sm text-slate-500">Se încarcă…</p>
+          ) : (
+            <div className="space-y-1.5">
+              {filtrate.map((inv) => {
+                const badge = RSVP_BADGE[inv.status_rsvp] || RSVP_BADGE.in_asteptare
+                return (
+                  <div key={inv.id} className="flex items-center justify-between gap-3 rounded-[14px] border border-slate-200 bg-white p-4">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-slate-900">{inv.nume || 'Fără nume'}</p>
+                      <div className="mt-1 flex flex-wrap gap-1.5">
+                        {inv.sursa === 'solicitare' ? (
+                          <Pill culoare="albastru">Invitat al angajatului {inv.solicitant || '—'}</Pill>
+                        ) : (
+                          <>
+                            {inv.categorie && <Pill>{inv.categorie}</Pill>}
+                            <Pill culoare={badge.culoare}>{badge.label}</Pill>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <span className="text-xs text-slate-500">{inv.prezent ? 'Prezent' : 'Neprezentat'}</span>
+                      <button
+                        onClick={() => toggleCheckin(inv)}
+                        disabled={busyId === inv.id}
+                        aria-label={inv.prezent ? 'Anulează prezența' : 'Marchează prezent'}
+                        className={`flex h-9 w-9 items-center justify-center rounded-full border-2 transition disabled:opacity-50 ${
+                          inv.prezent ? 'border-green-600 bg-green-600 text-white' : 'border-slate-300 text-transparent hover:border-accent'
+                        }`}
+                      >
+                        <Check size={16} />
+                      </button>
+                    </div>
                   </div>
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  <button
-                    onClick={() => copiazaLink(inv)}
-                    title="Copiază linkul RSVP al acestui invitat"
-                    className="flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-200"
-                  >
-                    <LinkIcon size={12} /> {copiat === inv.id ? 'Copiat!' : 'Link RSVP'}
-                  </button>
-                  <span className="text-xs text-slate-400">{inv.prezent ? 'Prezent' : 'Neprezentat'}</span>
-                  <button
-                    onClick={() => toggleCheckin(inv)}
-                    disabled={busyId === inv.id}
-                    className={`flex h-9 w-9 items-center justify-center rounded-full border-2 transition disabled:opacity-50 ${
-                      inv.prezent
-                        ? 'border-green-500 bg-green-500 text-white'
-                        : 'border-slate-300 text-transparent hover:border-accent'
-                    }`}
-                  >
-                    <Check size={16} />
-                  </button>
-                </div>
-              </div>
-            )
-          })}
-          {filtrate.length === 0 && <p className="py-6 text-center text-sm text-slate-400">Niciun invitat găsit.</p>}
-        </div>
+                )
+              })}
+              {filtrate.length === 0 && <p className="py-6 text-center text-sm text-slate-400">Niciun invitat găsit.</p>}
+            </div>
+          )}
+        </>
       )}
     </div>
   )

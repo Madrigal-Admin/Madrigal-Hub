@@ -2,15 +2,18 @@ import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
 import Navbar from './components/Navbar'
 import Sidebar from './components/Sidebar'
+import DashboardTab from './components/DashboardTab'
 import EvenimenteTab from './components/EvenimenteTab'
 import PersoaneTab from './components/PersoaneTab'
 import CheckinTab from './components/CheckinTab'
 import AprobariTab from './components/AprobariTab'
+import SetariTab from './components/SetariTab'
+import SolicitaTab from './components/SolicitaTab'
 import RsvpPage from './pages/RsvpPage'
 import DezabonarePage from './pages/DezabonarePage'
-import NominalizarePage from './pages/NominalizarePage'
 
-const ROLE_LABELS = { full: 'Admin', checkin: 'Verificare la intrare' }
+// full = Admin general; checkin = Verificare la intrare; angajat = implicit pentru orice angajat din Hub
+const ROLE_LABELS = { full: 'Admin general', checkin: 'Verificare la intrare', angajat: 'Angajat' }
 
 export default function App() {
   // ---- Pagini publice, fără login — verificate ÎNAINTE de orice logică
@@ -18,16 +21,18 @@ export default function App() {
   const params = new URLSearchParams(window.location.search)
   if (params.has('rsvp')) return <RsvpPage token={params.get('rsvp')} />
   if (params.has('dezabonare')) return <DezabonarePage token={params.get('dezabonare')} />
-  if (params.has('nominalizare')) return <NominalizarePage />
 
   return <AdminApp />
 }
+
+const PAGINA_INITIALA = { full: 'dashboard', checkin: 'checkin', angajat: 'solicita' }
 
 function AdminApp() {
   const [session, setSession] = useState(undefined)
   const [role, setRole] = useState(null)
   const [angajat, setAngajat] = useState(null)
-  const [view, setView] = useState('evenimente')
+  const [view, setView] = useState(null)
+  const [nrAprobari, setNrAprobari] = useState(0)
   const [checkingRole, setCheckingRole] = useState(false)
 
   useEffect(() => {
@@ -75,10 +80,26 @@ function AdminApp() {
       .eq('tool', 'invitatii')
       .maybeSingle()
 
+    // Orice angajat din Hub are cel puțin rolul „Angajat” (poate solicita invitații)
+    const rol = accesRow?.rol === 'full' || accesRow?.rol === 'checkin' ? accesRow.rol : 'angajat'
     setAngajat(angajatRow)
-    setRole(accesRow?.rol || 'unknown')
+    setRole(rol)
+    setView(PAGINA_INITIALA[rol])
     setCheckingRole(false)
   }
+
+  // Numărul cererilor în așteptare, pentru insigna din meniul adminului
+  async function reincarcaAprobari() {
+    const { count } = await supabase
+      .from('cereri_invitati')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'in_asteptare')
+    setNrAprobari(count || 0)
+  }
+
+  useEffect(() => {
+    if (role === 'full') reincarcaAprobari()
+  }, [role, view])
 
   async function handleLogout() {
     await supabase.auth.signOut()
@@ -97,8 +118,8 @@ function AdminApp() {
         <Navbar displayName={displayName} roleLabel={null} onLogout={handleLogout} />
         <main className="flex flex-1 flex-col items-center justify-center px-4">
           <div className="mx-auto max-w-md rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-800">
-            Contul tău nu are acces la tool-ul de Invitații. Contactează un administrator din Hub, în
-            secțiunea „Acces Tool-uri".
+            Contul tău nu este asociat unui angajat din Hub, așa că nu poți folosi Invitațiile. Contactează un
+            administrator din Hub.
           </div>
         </main>
       </div>
@@ -110,14 +131,19 @@ function AdminApp() {
       <Navbar displayName={displayName} roleLabel={ROLE_LABELS[role]} onLogout={handleLogout} />
 
       <div className="flex-1 flex flex-col md:flex-row min-h-0">
-        <Sidebar view={view} onSelect={setView} role={role} />
+        {role !== 'angajat' && <Sidebar view={view} onSelect={setView} role={role} badgeAprobari={nrAprobari} />}
 
         <main className="flex-1 p-6 md:p-8 min-w-0">
-          <div className="w-full">
-            {view === 'evenimente' && <EvenimenteTab role={role} session={session} />}
+          <div className={role === 'angajat' ? 'mx-auto w-full max-w-3xl' : 'w-full'}>
+            {view === 'dashboard' && role === 'full' && <DashboardTab />}
+            {view === 'evenimente' && role === 'full' && (
+              <EvenimenteTab session={session} onNavigate={setView} />
+            )}
             {view === 'persoane' && role === 'full' && <PersoaneTab />}
-            {view === 'checkin' && <CheckinTab />}
-            {view === 'aprobari' && role === 'full' && <AprobariTab />}
+            {view === 'checkin' && (role === 'full' || role === 'checkin') && <CheckinTab />}
+            {view === 'aprobari' && role === 'full' && <AprobariTab onChanged={reincarcaAprobari} />}
+            {view === 'setari' && role === 'full' && <SetariTab />}
+            {view === 'solicita' && <SolicitaTab />}
           </div>
         </main>
       </div>
