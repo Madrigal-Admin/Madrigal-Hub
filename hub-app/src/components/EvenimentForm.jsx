@@ -3,6 +3,7 @@ import { X as XIcon, Trash2 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { IMPLICARI, culoareText } from '../lib/evenimente'
 import AngajatiPicker from './AngajatiPicker'
+import SelectorLocalitate from './SelectorLocalitate'
 
 const inputCls = 'w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-accent focus:outline-none'
 const labelCls = 'mb-1 block text-xs font-medium text-slate-600'
@@ -21,6 +22,9 @@ export default function EvenimentForm({ eveniment, tipuri, statusuri, angajati, 
     ora_sfarsit: eveniment?.ora_sfarsit || '',
     locatie: eveniment?.locatie || '',
     localitate: eveniment?.localitate || '',
+    judet: eveniment?.judet || '',
+    siruta: eveniment?.siruta || '',
+    scris: '', // text de localitate tastat dar nealeas din listă
     organizator: eveniment?.organizator || '',
     implicare: eveniment?.implicare || '',
     bilete: eveniment?.bilete === true ? 'da' : eveniment?.bilete === false ? 'nu' : '',
@@ -52,6 +56,7 @@ export default function EvenimentForm({ eveniment, tipuri, statusuri, angajati, 
     if (!f.nume.trim()) return setError('Scrie numele evenimentului.')
     if (f.tipuri.length === 0) return setError('Alege cel puțin un tip de eveniment.')
     if (!f.data) return setError('Alege data de început.')
+    if (f.scris) return setError('Alege localitatea din lista de sugestii (sau șterge textul).')
     if (f.data_sfarsit && f.data_sfarsit < f.data) return setError('Data de sfârșit nu poate fi înaintea celei de început.')
     if (esteAnulat && !(eveniment?.status === f.status)) {
       const ok = window.confirm(
@@ -71,6 +76,8 @@ export default function EvenimentForm({ eveniment, tipuri, statusuri, angajati, 
         status: f.status,
         locatie: f.locatie.trim(),
         localitate: f.localitate.trim(),
+        judet: f.judet,
+        siruta: f.siruta,
         organizator: f.organizator.trim(),
         implicare: f.implicare,
         bilete: f.bilete === 'da' ? true : f.bilete === 'nu' ? false : null,
@@ -167,10 +174,12 @@ export default function EvenimentForm({ eveniment, tipuri, statusuri, angajati, 
               <label className={labelCls}>Locație</label>
               <input className={inputCls} value={f.locatie} onChange={(e) => set('locatie', e.target.value)} placeholder="ex: Sala Radio" />
             </div>
-            <div>
-              <label className={labelCls}>Localitate</label>
-              <input className={inputCls} value={f.localitate} onChange={(e) => set('localitate', e.target.value)} placeholder="ex: București" />
-            </div>
+            <SelectorLocalitate
+              valoare={{ judet: f.judet, localitate: f.localitate, siruta: f.siruta, scris: f.scris }}
+              onChange={(v) => setF((x) => ({ ...x, ...v }))}
+              inputCls={inputCls}
+              labelCls={labelCls}
+            />
             <div>
               <label className={labelCls}>Organizator</label>
               <input className={inputCls} value={f.organizator} onChange={(e) => set('organizator', e.target.value)} placeholder="ex: Madrigal, Arcub…" />

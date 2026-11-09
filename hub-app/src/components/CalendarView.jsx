@@ -314,7 +314,7 @@ export default function CalendarView({ canManageCalendar, canSeeStatistici }) {
                               {e.data_sfarsit && e.data_sfarsit !== e.data ? ` – ${formatData(e.data_sfarsit)}` : ''}
                               {ora ? ` · ${ora}` : ''}
                               {e.locatie ? ` · ${e.locatie}` : ''}
-                              {e.localitate ? ` · ${e.localitate}` : ''}
+                              {e.localitate ? ` · ${e.localitate}${e.judet && e.judet !== e.localitate && e.judet !== 'În afara României' ? `, ${e.judet}` : ''}` : ''}
                             </p>
                             {(pmNume.length > 0 || e.organizator) && (
                               <p className="text-xs text-slate-400 mt-0.5">

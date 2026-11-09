@@ -46,7 +46,7 @@ export default function DashboardEvenimente({ taskuri, ctx, evenimente = [], onO
         ]}
       />
       <div className="grid gap-4 lg:grid-cols-2">
-        <ListaRisc evenimente={evenimente} taskuri={taskuri} />
+        <ListaRisc ctx={ctx} evenimente={evenimente} taskuri={taskuri} />
         <ListaDeAlocat ctx={ctx} evenimente={evenimente} taskuri={taskuri} onOpen={onOpen} />
       </div>
       <div className="grid gap-4 lg:grid-cols-2">

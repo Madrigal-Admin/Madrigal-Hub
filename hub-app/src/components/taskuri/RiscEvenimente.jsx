@@ -14,15 +14,15 @@ export function ChipRisc({ nivel, mic = false }) {
 }
 
 // Evenimentele PM-ului, sortate după risc, cu motivul afișat.
-export function ListaRisc({ evenimente, taskuri }) {
+export function ListaRisc({ ctx, evenimente, taskuri }) {
   const randuri = useMemo(
-    () => evenimente.map((e) => ({ e, r: riscEveniment(e, taskuri) })).sort((a, b) => NIVELE[a.r.nivel].ordine - NIVELE[b.r.nivel].ordine || (a.e.data || '').localeCompare(b.e.data || '')),
-    [evenimente, taskuri]
+    () => evenimente.filter((e) => ['deschis', 'organizare'].includes(ctx.comportament(e.id))).map((e) => ({ e, r: riscEveniment(e, taskuri) })).sort((a, b) => NIVELE[a.r.nivel].ordine - NIVELE[b.r.nivel].ordine || (a.e.data || '').localeCompare(b.e.data || '')),
+    [ctx, evenimente, taskuri]
   )
   return (
     <section className="rounded-[14px] border border-[#E1E4EA] bg-white p-4">
       <h3 className="text-sm font-extrabold text-[#172036]">Evenimente la risc</h3>
-      <p className="mb-3 text-xs text-[#5B6578]">Roșu: ≤ 14 zile cu taskuri întârziate sau ≤ 7 zile cu taskuri nealocate / fără termen. Galben: întârzieri sau taskuri nealocate / fără termen în ≤ 30 de zile.</p>
+      <p className="mb-3 text-xs text-[#5B6578]">Roșu: ≤ 14 zile cu taskuri întârziate sau ≤ 7 zile cu taskuri nealocate / fără termen. Galben: întârzieri sau taskuri nealocate / fără termen în ≤ 30 de zile. Un eveniment încheiat dar nefinalizat apare galben (roșu după 7 zile). Fără taskuri: gri.</p>
       {randuri.length === 0 ? (
         <p className="text-sm text-[#5B6578]">Niciun eveniment ales.</p>
       ) : (
@@ -32,7 +32,7 @@ export function ListaRisc({ evenimente, taskuri }) {
               <ChipRisc nivel={r.nivel} />
               <span className="min-w-0 flex-1 basis-40">
                 <span className="block truncate text-sm font-bold text-[#172036]">{e.nume}</span>
-                <span className="block text-xs text-[#5B6578]">{dataScurta(e.data)} · {textZile(r.zile)}</span>
+                <span className="block text-xs text-[#5B6578]">{dataScurta(e.data)} · {textZile(r.zile, r.zileDeLaSfarsit)}</span>
               </span>
               <span className={`text-xs font-semibold ${r.nivel === 'verde' ? 'text-[#1E6B43]' : 'text-[#5B6578]'}`}>{r.text}</span>
             </li>
