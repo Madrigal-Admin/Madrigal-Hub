@@ -426,28 +426,45 @@ function TabContinut({ eveniment, session, onChanged }) {
   const [uploading, setUploading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const [numarInAsteptare, setNumarInAsteptare] = useState(null)
+  const [stare, setStare] = useState(null)
   const [linkuri, setLinkuri] = useState(null)
   const [trimitand, setTrimitand] = useState(false)
+  const [progres, setProgres] = useState(null)
   const [rezultatTrimitere, setRezultatTrimitere] = useState(null)
   const [generatingLinks, setGeneratingLinks] = useState(false)
 
   useEffect(() => {
-    numarare()
+    incarcaStare()
   }, [])
 
-  async function numarare() {
-    const { count } = await supabase
+  // Starea trimiterii: câți au de primit email, câți au primit deja, câți au eșuat, câți sunt dezabonați
+  async function incarcaStare() {
+    const { data } = await supabase
       .from('invitatii')
-      .select('id', { count: 'exact', head: true })
+      .select('id, status_rsvp, trimis_la, eroare_trimitere, persoana_id, persoane(nume, prenume, email, abonat_invitatii)')
       .eq('eveniment_id', eveniment.id)
-      .eq('status_rsvp', 'in_asteptare')
-    setNumarInAsteptare(count || 0)
+
+    const randuri = data || []
+    const cuPersoana = randuri.filter((i) => i.persoane)
+    setStare({
+      deTrimis: cuPersoana.filter((i) => !i.trimis_la && !i.eroare_trimitere && i.persoane.abonat_invitatii && i.status_rsvp === 'in_asteptare').length,
+      trimise: randuri.filter((i) => i.trimis_la).length,
+      dezabonati: cuPersoana.filter((i) => !i.trimis_la && !i.persoane.abonat_invitatii && i.status_rsvp === 'in_asteptare').length,
+      faraEmail: randuri.filter((i) => !i.persoana_id && !i.trimis_la && i.status_rsvp === 'in_asteptare').length,
+      esuate: cuPersoana
+        .filter((i) => !i.trimis_la && i.eroare_trimitere)
+        .map((i) => ({ id: i.id, nume: `${i.persoane.prenume} ${i.persoane.nume}`, email: i.persoane.email, eroare: i.eroare_trimitere })),
+    })
   }
 
   async function handleUpload(e) {
     const file = e.target.files?.[0]
     if (!file) return
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Afișul depășește 5 MB. Alege o imagine mai mică.')
+      e.target.value = ''
+      return
+    }
     setUploading(true)
     setError('')
 
@@ -458,7 +475,7 @@ function TabContinut({ eveniment, session, onChanged }) {
 
     if (uploadError) {
       setUploading(false)
-      setError('Nu am putut încărca afișul.')
+      setError('Nu am putut încărca afișul. Folosește o imagine JPEG sau PNG de maximum 5 MB.')
       return
     }
 
@@ -486,32 +503,51 @@ function TabContinut({ eveniment, session, onChanged }) {
     onChanged()
   }
 
-  async function handleTrimite() {
+  // Funcția de pe server trimite câte un lot; o apelăm până nu mai rămâne nimic de trimis.
+  // `reseteaza` = reîncearcă și invitațiile care au eșuat anterior.
+  async function handleTrimite(reseteaza = false) {
     setTrimitand(true)
     setError('')
     setRezultatTrimitere(null)
 
-    try {
-      const res = await fetch('/.netlify/functions/send-brevo', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ eveniment_id: eveniment.id }),
-      })
-      const result = await res.json()
+    const total = { trimise: 0, esuate: 0, oprit_limita: false }
+    setProgres(0)
 
-      if (!res.ok) {
-        setError(result.error || 'Trimiterea a eșuat.')
-      } else {
-        setRezultatTrimitere(result)
-        numarare()
-        onChanged()
+    try {
+      for (let ciclu = 0; ciclu < 100; ciclu += 1) {
+        const res = await fetch('/.netlify/functions/send-brevo', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ eveniment_id: eveniment.id, reseteaza_erori: reseteaza && ciclu === 0 }),
+        })
+        const result = await res.json()
+
+        if (!res.ok) {
+          setError(result.error || 'Trimiterea a eșuat.')
+          break
+        }
+
+        total.trimise += result.trimise
+        total.esuate += result.esuate
+        setProgres(total.trimise + total.esuate)
+
+        if (result.oprit_limita) {
+          total.oprit_limita = true
+          break
+        }
+        if (result.ramase === 0 || result.trimise + result.esuate === 0) break
       }
     } catch {
       setError('Nu am putut contacta funcția de trimitere.')
     }
+
+    setRezultatTrimitere(total)
+    setProgres(null)
+    await incarcaStare()
+    onChanged()
     setTrimitand(false)
   }
 
@@ -568,7 +604,7 @@ function TabContinut({ eveniment, session, onChanged }) {
         {afisUrl && <img src={afisUrl} alt="Afiș" className="mb-2 max-h-40 rounded-lg border border-slate-200" />}
         <input
           type="file"
-          accept="image/*"
+          accept="image/jpeg,image/png"
           onChange={handleUpload}
           disabled={uploading}
           className="w-full text-xs rounded-lg border border-slate-300 px-3 py-2"
@@ -587,24 +623,63 @@ function TabContinut({ eveniment, session, onChanged }) {
       </button>
 
       <div className="rounded-xl border border-slate-200 p-4">
-        <p className="mb-3 text-sm text-slate-600">
-          <strong>{numarInAsteptare ?? '…'}</strong> invitați în așteptare vor primi acest mesaj.
+        <p className="mb-1 text-sm text-slate-600">
+          <strong>{stare?.deTrimis ?? '…'}</strong> invitați vor primi acest mesaj.
         </p>
+        {stare && (
+          <p className="mb-3 text-xs text-slate-400">
+            {stare.trimise} trimise deja
+            {stare.esuate.length > 0 ? ` · ${stare.esuate.length} cu eroare` : ''}
+            {stare.dezabonati > 0 ? ` · ${stare.dezabonati} dezabonați (nu primesc email)` : ''}
+            {stare.faraEmail > 0 ? ` · ${stare.faraEmail} nominalizați fără adresă de email` : ''}
+          </p>
+        )}
 
-        <button
-          onClick={handleTrimite}
-          disabled={trimitand || !numarInAsteptare}
-          className="flex items-center gap-1.5 rounded-full bg-accent hover:bg-accent-hover text-white text-sm font-semibold px-4 py-2.5 transition disabled:opacity-50"
-        >
-          <Send size={14} /> {trimitand ? 'Se trimite...' : 'Trimite invitații'}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => handleTrimite(false)}
+            disabled={trimitand || !stare?.deTrimis}
+            className="flex items-center gap-1.5 rounded-full bg-accent hover:bg-accent-hover text-white text-sm font-semibold px-4 py-2.5 transition disabled:opacity-50"
+          >
+            <Send size={14} /> {trimitand ? `Se trimite... (${progres ?? 0})` : 'Trimite invitații'}
+          </button>
+
+          {stare?.esuate.length > 0 && (
+            <button
+              onClick={() => handleTrimite(true)}
+              disabled={trimitand}
+              className="flex items-center gap-1.5 rounded-full border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-medium px-4 py-2.5 transition disabled:opacity-50"
+            >
+              <Send size={14} /> Retrimite cele cu eroare ({stare.esuate.length})
+            </button>
+          )}
+        </div>
+
+        {trimitand && (
+          <p className="mt-2 text-xs text-slate-500">Nu închide pagina până se termină trimiterea.</p>
+        )}
 
         {rezultatTrimitere && (
-          <p className="mt-3 text-sm text-green-700">
+          <p className={`mt-3 text-sm ${rezultatTrimitere.oprit_limita ? 'text-amber-700' : 'text-green-700'}`}>
             {rezultatTrimitere.trimise} emailuri trimise
-            {rezultatTrimitere.esuate > 0 ? `, ${rezultatTrimitere.esuate} eșuate` : ''}
-            {rezultatTrimitere.faraEmail > 0 ? `, ${rezultatTrimitere.faraEmail} fără adresă de email (nominalizați)` : ''}.
+            {rezultatTrimitere.esuate > 0 ? `, ${rezultatTrimitere.esuate} eșuate` : ''}.
+            {rezultatTrimitere.oprit_limita
+              ? ' Trimiterea s-a oprit: contul Brevo a atins limita de trimitere. Cei rămași nu au fost marcați ca eșuați; apasă din nou „Trimite invitații” când limita se reînnoiește (de regulă a doua zi).'
+              : ''}
           </p>
+        )}
+
+        {stare?.esuate.length > 0 && (
+          <details className="mt-3 text-xs text-slate-600">
+            <summary className="cursor-pointer font-medium">Vezi invitațiile cu eroare</summary>
+            <ul className="mt-2 space-y-1">
+              {stare.esuate.map((e) => (
+                <li key={e.id}>
+                  <strong>{e.nume}</strong> ({e.email}): <span className="text-rose-600">{e.eroare}</span>
+                </li>
+              ))}
+            </ul>
+          </details>
         )}
 
         <div className="mt-4 border-t border-slate-100 pt-3">
