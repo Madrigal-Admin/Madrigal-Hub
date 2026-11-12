@@ -22,8 +22,8 @@ export function construiesteTooluri(accesTooluri = []) {
     are('administrativ') && { key: 'administrativ', label: 'Administrativ', icon: 'package', href: '/administrativ/' },
     are('rapoarte') && { key: 'rapoarte', label: 'Rapoarte', icon: 'file', href: '/rapoarte/' },
     are('financiar') && { key: 'financiar', label: 'Financiar', icon: 'receipt', href: '/financiar/' },
-    // Secretariat: vizibil pentru orice angajat (fără rol = „Angajat”, vede doar documentele repartizate lui)
-    { key: 'secretariat', label: 'Secretariat', icon: 'inbox', href: '/secretariat/' },
+    // Secretariat: vizibil doar cu un rol (Angajat / Secretariat / Conducere) sau pentru adminul Hub; fără rol = fără acces
+    (are('secretariat') || hubAdmin) && { key: 'secretariat', label: 'Secretariat', icon: 'inbox', href: '/secretariat/' },
     hubAdmin && { key: 'admin', label: 'Administrare Hub', icon: 'settings', href: '/?view=admin', view: 'admin' },
   ].filter(Boolean)
 }

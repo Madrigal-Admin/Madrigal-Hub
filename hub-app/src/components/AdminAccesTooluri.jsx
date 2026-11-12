@@ -16,7 +16,7 @@ const TOOLS = [
   },
   { key: 'financiar', label: 'Financiar', roles: ['angajat', 'admin_financiar'] },
   { key: 'taskuri', label: 'Taskuri', roles: ['angajat', 'admin'] },
-  { key: 'secretariat', label: 'Secretariat', roles: ['secretariat', 'conducere'] },
+  { key: 'secretariat', label: 'Secretariat', roles: ['angajat', 'secretariat', 'conducere'] },
 ]
 
 const ROLE_LABELS = {
@@ -34,7 +34,7 @@ const ROLE_LABELS = {
 }
 
 // Același cod de rol poate avea nume diferit la tool-uri diferite.
-const ROLE_LABELS_TOOL = { 'secretariat:secretariat': 'Secretariat', 'secretariat:conducere': 'Conducere', 'invitatii:full': 'Admin general', 'invitatii:checkin': 'Verificare la intrare', 'taskuri:admin': 'Admin taskuri', 'hub:admin': 'Admin Hub', 'calendar:admin': 'Admin calendar' }
+const ROLE_LABELS_TOOL = { 'secretariat:angajat': 'Angajat', 'secretariat:secretariat': 'Secretariat', 'secretariat:conducere': 'Conducere', 'invitatii:full': 'Admin general', 'invitatii:checkin': 'Verificare la intrare', 'taskuri:admin': 'Admin taskuri', 'hub:admin': 'Admin Hub', 'calendar:admin': 'Admin calendar' }
 const labelRol = (tool, r) => ROLE_LABELS_TOOL[`${tool}:${r}`] || ROLE_LABELS[r]
 
 export default function AdminAccesTooluri() {
