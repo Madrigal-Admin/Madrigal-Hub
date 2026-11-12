@@ -12,6 +12,7 @@ const DESCRIERI = {
   administrativ: 'Cere materiale din magazie',
   rapoarte: 'Rapoarte de activitate și post-eveniment',
   financiar: 'Referate de necesitate și deconturi',
+  secretariat: 'Registrele de intrări, ieșiri și documentele tale',
   admin: 'Angajați, acces, ghid',
 }
 
