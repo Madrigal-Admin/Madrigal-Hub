@@ -4,9 +4,10 @@ import { supabase } from '../supabaseClient'
 import { ETICHETE_CAMPURI, FLUX, MOD_SEMNARE, REGISTRE, STATUSURI, esteStaff, veziTot } from '../lib/roluri'
 import { formatData, formatDataOra, mesajEroare } from '../lib/util'
 import { btnDanger, btnGhost, btnPrimary, inputCls, labelCls } from '../lib/ui'
-import { Card, CasetaMotiv, Eroare, Info, StareBadge, Titlu, Valoare } from './comun'
+import { Card, CasetaMotiv, Eroare, Info, ModSemnareBadge, StareBadge, Titlu, Valoare } from './comun'
 import { AngajatiMulti } from './Pickere'
 import Fisiere from './Fisiere'
+import CircuitSectiune from './CircuitSectiune'
 
 function descriereJurnal(j, comune) {
   const d = j.detalii || {}
@@ -19,6 +20,14 @@ function descriereJurnal(j, comune) {
       const campuri = Object.keys(d).map((k) => ETICHETE_CAMPURI[k] || k)
       return `Modificat: ${campuri.join(', ')}`
     }
+    case 'semnatari_stabiliti':
+      return `Semnatari stabiliți (runda ${d.runda}): ${(d.semnatari || []).join(', ') || 'nimeni'}`
+    case 'pas_semnare': {
+      const verb = { primit: 'a primit documentul', semnat: 'a semnat', refuzat: 'a refuzat', inapoi: 'pas anulat' }[d.actiune] || d.actiune
+      return `${d.semnatar}: ${verb}${d.data ? ` (${formatData(d.data)})` : ''}${d.observatii ? ` — ${d.observatii}` : ''}`
+    }
+    case 'relansat':
+      return `Circuit relansat (runda ${d.runda})`
     case 'fisier_adaugat':
       return `Fișier adăugat (versiunea ${d.versiune}: ${d.nume})`
     case 'acces_confidential':
@@ -106,6 +115,7 @@ export default function DocumentDetaliu({ id, role, comune, onInapoi, onEdit, on
   const numeAng = (aid) => comune.angajati.find((a) => a.id === aid)?.nume_complet
   const numeGrup = (gid) => comune.grupuri.find((g) => g.id === gid)?.nume
   const resp = [numeAng(doc.resp_angajat_id), numeGrup(doc.resp_grup_id)].filter(Boolean).join(' · ')
+  const circuit = doc.registru === 'circuit'
   const poateRezolutie = doc.registru === 'intrari' && (staff || role === 'conducere') && activ
   const angajatPoateLucra = role === 'angajat' && doc.registru === 'intrari' && ['repartizat', 'in_lucru'].includes(doc.status)
   const schimba = (status) => ruleaza(() => supabase.rpc('sec_schimba_status', { p_id: doc.id, p_status: status }), 'Statusul a fost actualizat.')
@@ -116,13 +126,14 @@ export default function DocumentDetaliu({ id, role, comune, onInapoi, onEdit, on
 
       <Titlu
         actiuni={
-          staff && activ && (
+          staff && activ && (!circuit || doc.status === 'ciorna') && (
             <button className={btnGhost} onClick={() => onEdit(doc)}><Pencil size={14} /> Modifică</button>
           )
         }
       >
         <span className="mr-2">{doc.numar_afisat}</span>
         <StareBadge stare={doc.status} />
+        {circuit && <span className="ml-2 align-middle"><ModSemnareBadge mod={doc.mod_semnare} /></span>}
         {doc.confidential && (
           <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-slate-800 px-2.5 py-0.5 align-middle text-xs font-medium text-white">
             <Lock size={11} /> Confidențial
@@ -141,10 +152,10 @@ export default function DocumentDetaliu({ id, role, comune, onInapoi, onEdit, on
       <Card>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <Valoare eticheta="Data înregistrării">{formatData(doc.data_inreg)}</Valoare>
-          <Valoare eticheta={info.contact}>{doc.contact_denumire}</Valoare>
+          {!circuit && <Valoare eticheta={info.contact}>{doc.contact_denumire}</Valoare>}
           {doc.registru === 'intrari' && <Valoare eticheta="Document primit">{[doc.nr_document_extern, doc.data_document && `din ${formatData(doc.data_document)}`].filter(Boolean).join(' ')}</Valoare>}
           <div className="sm:col-span-2 lg:col-span-3"><Valoare eticheta="Obiect"><span className="whitespace-pre-wrap">{doc.obiect}</span></Valoare></div>
-          <Valoare eticheta={info.canal}>{doc.canal_denumire}</Valoare>
+          {!circuit && <Valoare eticheta={info.canal}>{doc.canal_denumire}</Valoare>}
           <Valoare eticheta="Tip document">{doc.tip_denumire}</Valoare>
           <Valoare eticheta="Mod de semnare">{MOD_SEMNARE[doc.mod_semnare]}</Valoare>
           <Valoare eticheta={info.resp}>{resp}</Valoare>
@@ -176,10 +187,12 @@ export default function DocumentDetaliu({ id, role, comune, onInapoi, onEdit, on
         )}
       </Card>
 
+      {circuit && <CircuitSectiune doc={doc} role={role} comune={comune} fisiere={fisiere} reload={incarca} />}
+
       {/* Acțiuni de status */}
       {(staff && doc.status !== 'anulat') || angajatPoateLucra ? (
         <Card className="space-y-3">
-          <h3 className="text-sm font-semibold text-slate-800">Status</h3>
+          <h3 className="text-sm font-semibold text-slate-800">{circuit ? 'Anulare' : 'Status'}</h3>
           {angajatPoateLucra && (
             <div className="flex flex-wrap gap-2">
               {doc.status === 'repartizat' && <button className={btnPrimary} disabled={busy} onClick={() => schimba('in_lucru')}>Preiau în lucru</button>}
@@ -188,6 +201,7 @@ export default function DocumentDetaliu({ id, role, comune, onInapoi, onEdit, on
           )}
           {staff && (
             <div className="flex flex-wrap items-end gap-2">
+              {!circuit && (<>
               <div>
                 <label className={labelCls} htmlFor="statusNou">Schimbă statusul în</label>
                 <select id="statusNou" className={inputCls} value={statusNou} onChange={(e) => setStatusNou(e.target.value)}>
@@ -196,6 +210,7 @@ export default function DocumentDetaliu({ id, role, comune, onInapoi, onEdit, on
                 </select>
               </div>
               <button className={btnPrimary} disabled={!statusNou || busy} onClick={async () => { await schimba(statusNou); setStatusNou('') }}>Schimbă</button>
+              </>)}
               <button className={btnDanger} disabled={busy} onClick={() => setAnuleaza(true)}>Anulează documentul</button>
             </div>
           )}

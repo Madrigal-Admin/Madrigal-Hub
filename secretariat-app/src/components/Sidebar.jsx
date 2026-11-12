@@ -3,7 +3,7 @@ import { esteStaff, veziTot } from '../lib/roluri'
 export const SECTIUNI = [
   { grup: 'Registre', key: 'intrari', label: 'Intrări', vizibil: () => true },
   { grup: 'Registre', key: 'iesiri', label: 'Ieșiri', vizibil: () => true },
-  { grup: 'Registre', key: 'circuit', label: 'Circuit de semnare', vizibil: (r) => veziTot(r) },
+  { grup: 'Registre', key: 'circuit', label: 'Circuit de semnare', vizibil: () => true },
   { grup: 'Administrare', key: 'contacte', label: 'Contacte', vizibil: (r) => veziTot(r) },
   { grup: 'Administrare', key: 'setari', label: 'Setări', vizibil: (r) => esteStaff(r) },
 ]

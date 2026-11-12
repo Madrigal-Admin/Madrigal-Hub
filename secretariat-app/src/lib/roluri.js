@@ -27,6 +27,14 @@ export const REGISTRE = {
     resp: 'Departament / persoană inițiatoare',
     nou: 'Înregistrare document ieșit',
   },
+  circuit: {
+    label: 'Circuit de semnare',
+    prefix: 'CS',
+    contact: 'Contact',
+    canal: 'Canal',
+    resp: 'Inițiator (persoană / departament)',
+    nou: 'Document nou pentru semnare',
+  },
 }
 
 const gri = 'bg-slate-100 text-slate-600'
@@ -43,6 +51,11 @@ export const STATUSURI = {
   transmis: { label: 'Transmis', clasa: albastru },
   confirmat: { label: 'Confirmat de destinatar', clasa: verde },
   arhivat: { label: 'Arhivat', clasa: 'bg-violet-50 text-violet-700' },
+  // Circuit de semnare (în baza de date: ciorna / in_circuit / semnat / refuzat)
+  ciorna: { label: 'Ciornă', clasa: gri },
+  in_circuit: { label: 'În lucru', clasa: galben },
+  semnat: { label: 'Finalizat', clasa: verde },
+  refuzat: { label: 'Refuzat', clasa: 'bg-rose-50 text-rose-700' },
   anulat: { label: 'Anulat', clasa: anulat },
 }
 
@@ -51,6 +64,20 @@ export const FLUX = {
   intrari: ['inregistrat', 'repartizat', 'in_lucru', 'solutionat', 'arhivat'],
   iesiri: ['inregistrat', 'transmis', 'confirmat', 'arhivat'],
 }
+
+export const STARE_SEMNATAR = {
+  asteapta: { label: 'Așteaptă', clasa: gri },
+  primit: { label: 'Primit', clasa: galben },
+  semnat: { label: 'Semnat', clasa: verde },
+  refuzat: { label: 'Refuzat', clasa: 'bg-rose-50 text-rose-700' },
+}
+
+export const ORDINE_SEMNARE = {
+  pe_rand: 'Pe rând (în ordinea din listă)',
+  paralel: 'În paralel (în orice ordine)',
+}
+
+export const MOD_SEMNARE_SCURT = { fizica: 'Semnătură fizică', electronica: 'Semnătură electronică' }
 
 export const MOD_SEMNARE = {
   fizica: 'Fizică (pe hârtie, se scanează)',
@@ -73,6 +100,9 @@ export const ETICHETE_CAMPURI = {
   rezolutie_data: 'Data rezoluției',
   legat_de: 'Legătură cu alt document',
   termen_raspuns: 'Termen de răspuns',
+  ordine_semnare: 'Ordinea de semnare',
+  locatie_hartie: 'Locația documentului',
+  runda: 'Runda de semnare',
   confidential: 'Confidențial',
   status: 'Status',
   motiv_anulare: 'Motiv anulare',

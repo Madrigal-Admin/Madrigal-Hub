@@ -2,6 +2,8 @@ import { useState } from 'react'
 import RegistruLista from './RegistruLista'
 import DocumentDetaliu from './DocumentDetaliu'
 import DocumentForm from './DocumentForm'
+import CircuitForm from './CircuitForm'
+import CircuitLista from './CircuitLista'
 
 // Un registru (Intrări sau Ieșiri) are trei ecrane: lista, detaliul unui document și formularul.
 export default function Registru({ registru, params, role, comune, go }) {
@@ -12,8 +14,9 @@ export default function Registru({ registru, params, role, comune, go }) {
   const lista = () => setEcran({ tip: 'lista' })
 
   if (ecran.tip === 'form') {
+    const Formular = registru === 'circuit' ? CircuitForm : DocumentForm
     return (
-      <DocumentForm
+      <Formular
         registru={registru}
         doc={ecran.doc || null}
         role={role}
@@ -35,8 +38,9 @@ export default function Registru({ registru, params, role, comune, go }) {
       />
     )
   }
+  const Lista = registru === 'circuit' ? CircuitLista : RegistruLista
   return (
-    <RegistruLista
+    <Lista
       registru={registru}
       role={role}
       comune={comune}

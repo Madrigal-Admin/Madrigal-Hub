@@ -77,14 +77,14 @@ function ListEditor({ tabel, titlu, descriere, reload }) {
 function Numerotare({ admin }) {
   const an = new Date().getFullYear()
   const [stare, setStare] = useState({})
-  const [valori, setValori] = useState({ intrari: { nr: '', data: '' }, iesiri: { nr: '', data: '' } })
+  const [valori, setValori] = useState({ intrari: { nr: '', data: '' }, iesiri: { nr: '', data: '' }, circuit: { nr: '', data: '' } })
   const [eroare, setEroare] = useState('')
   const [mesaj, setMesaj] = useState('')
   const [busy, setBusy] = useState(false)
 
   async function incarca() {
     const out = {}
-    for (const reg of ['intrari', 'iesiri']) {
+    for (const reg of ['intrari', 'iesiri', 'circuit']) {
       const [{ data: c }, { count }] = await Promise.all([
         supabase.from('sec_contoare').select('*').eq('registru', reg).eq('an', an).maybeSingle(),
         supabase.from('sec_documente').select('id', { count: 'exact', head: true }).eq('registru', reg).eq('an', an),
@@ -121,7 +121,7 @@ function Numerotare({ admin }) {
       <Eroare>{eroare}</Eroare>
       {mesaj && <Info>{mesaj}</Info>}
       <div className="grid gap-4 md:grid-cols-2">
-        {['intrari', 'iesiri'].map((reg) => {
+        {['intrari', 'iesiri', 'circuit'].map((reg) => {
           const s = stare[reg]
           if (!s) return <p key={reg} className="text-sm text-slate-400">Se încarcă…</p>
           const blocat = s.documente > 0

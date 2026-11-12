@@ -1,10 +1,25 @@
 import { useState } from 'react'
-import { STATUSURI } from '../lib/roluri'
+import { MOD_SEMNARE_SCURT, STARE_SEMNATAR, STATUSURI } from '../lib/roluri'
 import { btnGhost, btnPrimary, inputCls, labelCls } from '../lib/ui'
 
 export function StareBadge({ stare }) {
   const s = STATUSURI[stare] || { label: stare, clasa: 'bg-slate-100 text-slate-600' }
   return <span className={`inline-block whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ${s.clasa}`}>{s.label}</span>
+}
+
+export function StareSemnatarBadge({ stare }) {
+  const s = STARE_SEMNATAR[stare] || { label: stare, clasa: 'bg-slate-100 text-slate-600' }
+  return <span className={`inline-block whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ${s.clasa}`}>{s.label}</span>
+}
+
+// Modul de semnare (fizică / electronică) — se arată în orice status
+export function ModSemnareBadge({ mod }) {
+  const electronic = mod === 'electronica'
+  return (
+    <span className={`inline-block whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-medium ${electronic ? 'border-indigo-200 bg-indigo-50 text-indigo-700' : 'border-slate-300 bg-white text-slate-600'}`}>
+      {MOD_SEMNARE_SCURT[mod] || mod}
+    </span>
+  )
 }
 
 export function Card({ children, className = '' }) {

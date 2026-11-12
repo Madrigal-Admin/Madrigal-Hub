@@ -5,7 +5,6 @@ import Sidebar, { sectiuniPermise } from './components/Sidebar'
 import Registru from './components/Registru'
 import Contacte from './components/Contacte'
 import Setari from './components/Setari'
-import ComingSoon from './components/ComingSoon'
 
 export default function App() {
   const [session, setSession] = useState(undefined)
@@ -62,7 +61,7 @@ export default function App() {
       const q = new URLSearchParams(window.location.search)
       const reg = q.get('registru')
       const id = q.get('id')
-      if ((reg === 'intrari' || reg === 'iesiri') && id) {
+      if ((reg === 'intrari' || reg === 'iesiri' || reg === 'circuit') && id) {
         setNav({ view: reg, params: { id } })
       } else {
         setNav({ view: sectiuniPermise(r)[0]?.key || '', params: null })
@@ -106,10 +105,9 @@ export default function App() {
         <Sidebar view={view} onSelect={(v) => go(v)} role={role} />
         <main className="min-w-0 flex-1 p-6 md:p-8">
           <div className="w-full">
-            {(view === 'intrari' || view === 'iesiri') && (
+            {(view === 'intrari' || view === 'iesiri' || view === 'circuit') && (
               <Registru key={`${view}-${params?.id || ''}`} registru={view} params={params} {...comun} />
             )}
-            {view === 'circuit' && <ComingSoon titlu="Circuit de semnare" />}
             {view === 'contacte' && <Contacte role={role} angajat={angajat} />}
             {view === 'setari' && <Setari role={role} comune={comune} reload={incarcaComune} />}
           </div>
