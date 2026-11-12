@@ -163,7 +163,7 @@ export function RespPicker({ eticheta, angajatId, grupId, onChange, comune, obli
 }
 
 // Alegerea unui alt document din registre (legătură Intrare ↔ Ieșire), după număr sau obiect
-export function DocPicker({ eticheta, valoare, onChange, excludeId }) {
+export function DocPicker({ eticheta, valoare, onChange, excludeId, registru }) {
   const [text, setText] = useState('')
   const [optiuni, setOptiuni] = useState([])
   const [deschis, setDeschis] = useState(false)
@@ -176,12 +176,13 @@ export function DocPicker({ eticheta, valoare, onChange, excludeId }) {
       let q = supabase.from('sec_documente_lista').select('id, numar_afisat, obiect, contact_denumire, status')
         .neq('status', 'anulat').order('created_at', { ascending: false }).limit(8)
       if (excludeId) q = q.neq('id', excludeId)
+      if (registru) q = q.eq('registru', registru)
       if (t) q = q.or(`numar_afisat.ilike.%${t}%,obiect.ilike.%${t}%,contact_denumire.ilike.%${t}%`)
       const { data } = await q
       setOptiuni(data || [])
     }, 250)
     return () => clearTimeout(handle)
-  }, [text, deschis, excludeId])
+  }, [text, deschis, excludeId, registru])
 
   useEffect(() => {
     const afara = (e) => { if (radacina.current && !radacina.current.contains(e.target)) setDeschis(false) }

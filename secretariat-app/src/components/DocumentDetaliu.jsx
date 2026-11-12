@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { ArrowLeft, Lock, Pencil } from 'lucide-react'
+import { ArrowLeft, FileOutput, Lock, Pencil, Send } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { ETICHETE_CAMPURI, FLUX, MOD_SEMNARE, REGISTRE, STATUSURI, esteStaff, veziTot } from '../lib/roluri'
 import { formatData, formatDataOra, mesajEroare } from '../lib/util'
@@ -37,12 +37,14 @@ function descriereJurnal(j, comune) {
   }
 }
 
-export default function DocumentDetaliu({ id, role, comune, onInapoi, onEdit, onDeschide }) {
+export default function DocumentDetaliu({ id, role, comune, onInapoi, onEdit, onDeschide, onNou }) {
   const [doc, setDoc] = useState(undefined) // undefined = se încarcă, null = nu există / fără acces
   const [fisiere, setFisiere] = useState([])
   const [jurnal, setJurnal] = useState(null)
   const [legat, setLegat] = useState(null)
   const [legaturi, setLegaturi] = useState([])
+  const [iesiriCircuit, setIesiriCircuit] = useState([]) // Ieșirile create din acest document de Circuit
+  const [circuitSursa, setCircuitSursa] = useState(null) // Circuitul din care provine această Ieșire
   const [acces, setAcces] = useState([])
   const [accesNou, setAccesNou] = useState([])
   const [confNou, setConfNou] = useState(false)
@@ -61,14 +63,16 @@ export default function DocumentDetaliu({ id, role, comune, onInapoi, onEdit, on
     const cereri = [
       supabase.from('sec_fisiere').select('*').eq('document_id', id).order('versiune', { ascending: false }),
       supabase.from('sec_documente_lista').select('id, registru, numar_afisat, obiect').eq('legat_de', id),
+      supabase.from('sec_documente_lista').select('id, registru, numar_afisat, obiect, status').eq('circuit_id', id).order('created_at'),
     ]
     if (veziTot(role)) {
       cereri.push(supabase.from('sec_jurnal').select('*').eq('document_id', id).order('la', { ascending: false }))
       cereri.push(supabase.from('sec_confidential_acces').select('angajat_id').eq('document_id', id))
     }
-    const [fis, leg, jur, acc] = await Promise.all(cereri)
+    const [fis, leg, ies, jur, acc] = await Promise.all(cereri)
     setFisiere(fis.data || [])
     setLegaturi(leg.data || [])
+    setIesiriCircuit(ies.data || [])
     if (jur) setJurnal(jur.data || [])
     if (acc) {
       const ids = (acc.data || []).map((x) => x.angajat_id)
@@ -76,6 +80,12 @@ export default function DocumentDetaliu({ id, role, comune, onInapoi, onEdit, on
       setAccesNou(ids)
     }
     setConfNou(d.confidential)
+    if (d.circuit_id) {
+      const { data: c } = await supabase.from('sec_documente_lista').select('id, registru, numar_afisat, obiect').eq('id', d.circuit_id).maybeSingle()
+      setCircuitSursa(c || { id: null, numar_afisat: 'Document la care nu ai acces', obiect: '' })
+    } else {
+      setCircuitSursa(null)
+    }
     if (d.legat_de) {
       const { data: l } = await supabase.from('sec_documente_lista').select('id, registru, numar_afisat, obiect').eq('id', d.legat_de).maybeSingle()
       setLegat(l || { id: null, numar_afisat: 'Document la care nu ai acces', obiect: '' })
@@ -118,6 +128,37 @@ export default function DocumentDetaliu({ id, role, comune, onInapoi, onEdit, on
   const circuit = doc.registru === 'circuit'
   const poateRezolutie = doc.registru === 'intrari' && (staff || role === 'conducere') && activ
   const angajatPoateLucra = role === 'angajat' && doc.registru === 'intrari' && ['repartizat', 'in_lucru'].includes(doc.status)
+  // Din Intrare → Circuit de semnare (documentul de semnat este răspunsul la această Intrare)
+  const trimiteLaSemnare = () =>
+    onNou('circuit', {
+      legat: { id: doc.id, numar_afisat: doc.numar_afisat, obiect: doc.obiect },
+      obiect: doc.obiect,
+      tip_id: doc.tip_id || '',
+      resp_angajat_id: doc.resp_angajat_id || '',
+      resp_grup_id: doc.resp_grup_id || '',
+    })
+  // Din Circuit finalizat → Ieșire nouă (se pot crea oricâte); fișierul semnat se copiază la salvare
+  async function creazaIesire() {
+    setEroare('')
+    let contact = null
+    if (doc.legat_de) {
+      const { data: i } = await supabase.from('sec_documente_lista').select('contact_id, contact_denumire').eq('id', doc.legat_de).maybeSingle()
+      if (i?.contact_id) contact = { id: i.contact_id, denumire: i.contact_denumire }
+    }
+    const curent = fisiere.find((x) => x.curenta)
+    onNou('iesiri', {
+      circuit: { id: doc.id, numar_afisat: doc.numar_afisat },
+      legat: legat?.id ? { id: legat.id, numar_afisat: legat.numar_afisat, obiect: legat.obiect } : null,
+      contact,
+      obiect: doc.obiect,
+      tip_id: doc.tip_id || '',
+      mod_semnare: doc.mod_semnare,
+      resp_angajat_id: doc.resp_angajat_id || '',
+      resp_grup_id: doc.resp_grup_id || '',
+      confidential: doc.confidential,
+      fisier: curent ? { path: curent.path, nume: curent.nume_original } : null,
+    })
+  }
   const schimba = (status) => ruleaza(() => supabase.rpc('sec_schimba_status', { p_id: doc.id, p_status: status }), 'Statusul a fost actualizat.')
 
   return (
@@ -126,9 +167,17 @@ export default function DocumentDetaliu({ id, role, comune, onInapoi, onEdit, on
 
       <Titlu
         actiuni={
-          staff && activ && (!circuit || doc.status === 'ciorna') && (
-            <button className={btnGhost} onClick={() => onEdit(doc)}><Pencil size={14} /> Modifică</button>
-          )
+          <>
+            {staff && doc.registru === 'intrari' && doc.status !== 'anulat' && (
+              <button className={btnPrimary} onClick={trimiteLaSemnare}><Send size={14} /> Trimite la semnare</button>
+            )}
+            {staff && circuit && doc.status === 'semnat' && (
+              <button className={btnPrimary} onClick={creazaIesire}><FileOutput size={14} /> Înregistrează în Ieșiri</button>
+            )}
+            {staff && activ && (!circuit || doc.status === 'ciorna') && (
+              <button className={btnGhost} onClick={() => onEdit(doc)}><Pencil size={14} /> Modifică</button>
+            )}
+          </>
         }
       >
         <span className="mr-2">{doc.numar_afisat}</span>
@@ -165,7 +214,7 @@ export default function DocumentDetaliu({ id, role, comune, onInapoi, onEdit, on
           <Valoare eticheta="Înregistrat de">{numeAng(doc.creat_de)}</Valoare>
         </div>
 
-        {(legat || legaturi.length > 0) && (
+        {(legat || circuitSursa || legaturi.length > 0 || iesiriCircuit.length > 0) && (
           <div className="mt-4 space-y-1 border-t border-slate-100 pt-3 text-sm">
             {legat && (
               <p>
@@ -176,7 +225,23 @@ export default function DocumentDetaliu({ id, role, comune, onInapoi, onEdit, on
                 {legat.obiect && <span className="text-slate-500"> — {legat.obiect}</span>}
               </p>
             )}
-            {legaturi.map((l) => (
+            {circuitSursa && (
+              <p>
+                <span className="text-xs font-medium text-slate-500">Creat din documentul semnat: </span>
+                {circuitSursa.id ? (
+                  <button className="font-semibold text-accent hover:underline" onClick={() => onDeschide('circuit', circuitSursa.id)}>{circuitSursa.numar_afisat}</button>
+                ) : <span className="text-slate-500">{circuitSursa.numar_afisat}</span>}
+                {circuitSursa.obiect && <span className="text-slate-500"> — {circuitSursa.obiect}</span>}
+              </p>
+            )}
+            {iesiriCircuit.map((l) => (
+              <p key={l.id}>
+                <span className="text-xs font-medium text-slate-500">Înregistrat în Ieșiri ca: </span>
+                <button className="font-semibold text-accent hover:underline" onClick={() => onDeschide('iesiri', l.id)}>{l.numar_afisat}</button>
+                <span className="text-slate-500"> — {l.obiect}</span>
+              </p>
+            ))}
+            {legaturi.filter((l) => !iesiriCircuit.some((x) => x.id === l.id)).map((l) => (
               <p key={l.id}>
                 <span className="text-xs font-medium text-slate-500">Document legat: </span>
                 <button className="font-semibold text-accent hover:underline" onClick={() => onDeschide(l.registru, l.id)}>{l.numar_afisat}</button>

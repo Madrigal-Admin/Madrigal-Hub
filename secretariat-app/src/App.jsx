@@ -106,7 +106,7 @@ export default function App() {
         <main className="min-w-0 flex-1 p-6 md:p-8">
           <div className="w-full">
             {(view === 'intrari' || view === 'iesiri' || view === 'circuit') && (
-              <Registru key={`${view}-${params?.id || ''}`} registru={view} params={params} {...comun} />
+              <Registru key={`${view}-${params?.id || ''}-${params?.nou?.ts || ''}`} registru={view} params={params} {...comun} />
             )}
             {view === 'contacte' && <Contacte role={role} angajat={angajat} />}
             {view === 'setari' && <Setari role={role} comune={comune} reload={incarcaComune} />}

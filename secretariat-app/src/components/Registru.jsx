@@ -7,7 +7,10 @@ import CircuitLista from './CircuitLista'
 
 // Un registru (Intrări sau Ieșiri) are trei ecrane: lista, detaliul unui document și formularul.
 export default function Registru({ registru, params, role, comune, go }) {
-  const [ecran, setEcran] = useState(params?.id ? { tip: 'detaliu', id: params.id } : { tip: 'lista' })
+  const [ecran, setEcran] = useState(() => {
+    if (params?.nou) return { tip: 'form', doc: null, prefill: params.nou }
+    return params?.id ? { tip: 'detaliu', id: params.id } : { tip: 'lista' }
+  })
   // La revenirea în listă se păstrează filtrele, ca să nu se piardă căutarea
   const [filtre, setFiltre] = useState(null)
 
@@ -19,6 +22,7 @@ export default function Registru({ registru, params, role, comune, go }) {
       <Formular
         registru={registru}
         doc={ecran.doc || null}
+        prefill={ecran.prefill || null}
         role={role}
         comune={comune}
         onSalvat={(id) => setEcran({ tip: 'detaliu', id })}
@@ -35,6 +39,7 @@ export default function Registru({ registru, params, role, comune, go }) {
         onInapoi={lista}
         onEdit={(doc) => setEcran({ tip: 'form', doc })}
         onDeschide={(reg, id) => (reg === registru ? setEcran({ tip: 'detaliu', id }) : go(reg, { id }))}
+        onNou={(reg, nou) => go(reg, { nou: { ...nou, ts: Date.now() } })}
       />
     )
   }

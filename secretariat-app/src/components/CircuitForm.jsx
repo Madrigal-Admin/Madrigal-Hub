@@ -4,20 +4,21 @@ import { MOD_SEMNARE, REGISTRE, esteStaff } from '../lib/roluri'
 import { azi, mesajEroare } from '../lib/util'
 import { btnGhost, btnPrimary, inputCls, labelCls } from '../lib/ui'
 import { Card, Eroare, Info, Titlu } from './comun'
-import { AngajatiMulti, RespPicker } from './Pickere'
+import { AngajatiMulti, DocPicker, RespPicker } from './Pickere'
 import SemnatariEditor from './SemnatariEditor'
 
 // Formular pentru un document din Circuitul de semnare: înregistrare nouă (doc = null) sau modificare în Ciornă.
-export default function CircuitForm({ doc, role, comune, onSalvat, onRenunta }) {
+export default function CircuitForm({ doc, prefill, role, comune, onSalvat, onRenunta }) {
   const info = REGISTRE.circuit
   const editare = !!doc
   const [f, setF] = useState(() => ({
     data_inreg: azi(),
-    obiect: doc?.obiect || '',
-    tip_id: doc?.tip_id || '',
+    obiect: doc?.obiect || prefill?.obiect || '',
+    tip_id: doc?.tip_id || prefill?.tip_id || '',
     mod_semnare: doc?.mod_semnare || 'fizica',
-    resp_angajat_id: doc?.resp_angajat_id || '',
-    resp_grup_id: doc?.resp_grup_id || '',
+    resp_angajat_id: doc?.resp_angajat_id || prefill?.resp_angajat_id || '',
+    resp_grup_id: doc?.resp_grup_id || prefill?.resp_grup_id || '',
+    legat: prefill?.legat || null,
     ordine_semnare: doc?.ordine_semnare || 'pe_rand',
     locatie_hartie: doc ? doc.locatie_hartie || '' : 'La secretariat',
     semnatari: [],
@@ -27,6 +28,13 @@ export default function CircuitForm({ doc, role, comune, onSalvat, onRenunta }) 
   const [eroare, setEroare] = useState('')
   const [avertisment, setAvertisment] = useState(null) // { id, mesaj } dacă documentul a fost înregistrat, dar un pas următor a eșuat
   const [busy, setBusy] = useState(false)
+
+  // Intrarea la care e legat documentul (dacă există), pentru afișare
+  useEffect(() => {
+    if (!doc?.legat_de) return
+    supabase.from('sec_documente_lista').select('id, numar_afisat, obiect').eq('id', doc.legat_de).maybeSingle()
+      .then(({ data }) => setF((v) => ({ ...v, legat: data || { id: doc.legat_de, numar_afisat: '(document la care nu ai acces)', obiect: '' } })))
+  }, [doc?.legat_de])
 
   useEffect(() => {
     if (!doc) return
@@ -48,6 +56,7 @@ export default function CircuitForm({ doc, role, comune, onSalvat, onRenunta }) 
       mod_semnare: f.mod_semnare,
       resp_angajat_id: f.resp_angajat_id,
       resp_grup_id: f.resp_grup_id,
+      legat_de: f.legat?.id || '',
       ordine_semnare: f.ordine_semnare,
       locatie_hartie: f.mod_semnare === 'fizica' ? f.locatie_hartie : '',
     }
@@ -88,6 +97,7 @@ export default function CircuitForm({ doc, role, comune, onSalvat, onRenunta }) 
     <form onSubmit={(e) => { e.preventDefault(); salveaza(false) }} className="space-y-4">
       <Titlu>{editare ? `Modificare ${doc.numar_afisat}` : info.nou}</Titlu>
       {!esteStaff(role) && <Eroare>Nu ai dreptul să înregistrezi sau să modifici documente.</Eroare>}
+      {!editare && prefill?.legat && <Info>Document pornit din Intrarea {prefill.legat.numar_afisat}. Poți schimba sau șterge legătura mai jos.</Info>}
       {!editare && <Info>Numărul (CS) se acordă automat la salvare. Documentul pornește ca Ciornă și ajunge „În lucru” când îl trimiți la semnare.</Info>}
       <Eroare>{eroare}</Eroare>
       {avertisment && (
@@ -125,6 +135,14 @@ export default function CircuitForm({ doc, role, comune, onSalvat, onRenunta }) 
             comune={comune}
             onChange={({ angajatId, grupId }) => setF((x) => ({ ...x, resp_angajat_id: angajatId, resp_grup_id: grupId }))}
           />
+          <div className="md:col-span-2">
+            <DocPicker
+              eticheta="Legat de o Intrare (opțional) — pentru un document nou al instituției, lasă gol"
+              registru="intrari"
+              valoare={f.legat}
+              onChange={(d) => set('legat', d)}
+            />
+          </div>
           <div>
             <p className={labelCls}>Mod de semnare</p>
             <div className="space-y-1 text-sm text-slate-700">

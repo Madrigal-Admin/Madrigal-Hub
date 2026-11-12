@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { MOD_SEMNARE, REGISTRE, esteStaff } from '../lib/roluri'
 import { azi, mesajEroare } from '../lib/util'
+import { BUCKET } from '../lib/fisiere'
 import { btnGhost, btnPrimary, inputCls, labelCls } from '../lib/ui'
 import { Card, Eroare, Info, Titlu } from './comun'
 import { AngajatiMulti, ContactPicker, DocPicker, RespPicker } from './Pickere'
@@ -9,7 +10,7 @@ import { AngajatiMulti, ContactPicker, DocPicker, RespPicker } from './Pickere'
 const FARA_NUMAR = 'fără număr'
 
 // Formular de înregistrare (doc = null) sau de modificare (doc = documentul existent).
-export default function DocumentForm({ registru, doc, role, comune, onSalvat, onRenunta }) {
+export default function DocumentForm({ registru, doc, prefill, role, comune, onSalvat, onRenunta }) {
   const info = REGISTRE[registru]
   const editare = !!doc
   const intrari = registru === 'intrari'
@@ -18,22 +19,24 @@ export default function DocumentForm({ registru, doc, role, comune, onSalvat, on
     data_document: doc?.data_document || '',
     nr_document_extern: doc?.nr_document_extern || '',
     fara_numar: doc?.nr_document_extern === FARA_NUMAR,
-    contact: doc?.contact_id ? { id: doc.contact_id, denumire: doc.contact_denumire } : null,
-    obiect: doc?.obiect || '',
+    contact: doc?.contact_id ? { id: doc.contact_id, denumire: doc.contact_denumire } : prefill?.contact || null,
+    obiect: doc?.obiect || prefill?.obiect || '',
     canal_id: doc?.canal_id || '',
-    tip_id: doc?.tip_id || '',
-    mod_semnare: doc?.mod_semnare || 'fizica',
-    resp_angajat_id: doc?.resp_angajat_id || '',
-    resp_grup_id: doc?.resp_grup_id || '',
+    tip_id: doc?.tip_id || prefill?.tip_id || '',
+    mod_semnare: doc?.mod_semnare || prefill?.mod_semnare || 'fizica',
+    resp_angajat_id: doc?.resp_angajat_id || prefill?.resp_angajat_id || '',
+    resp_grup_id: doc?.resp_grup_id || prefill?.resp_grup_id || '',
     semnatar_id: doc?.semnatar_id || '',
     data_transmitere: doc?.data_transmitere || '',
     termen_raspuns: doc?.termen_raspuns || '',
-    legat: null,
-    confidential: false,
+    legat: prefill?.legat || null,
+    confidential: prefill?.confidential || false,
     acces: [],
   }))
   const [eroare, setEroare] = useState('')
   const [busy, setBusy] = useState(false)
+  const [avertisment, setAvertisment] = useState(null) // { id, mesaj }
+  const circuit = prefill?.circuit || null // documentul din Circuit din care se creează Ieșirea
 
   // Documentul la care e legat (dacă există), pentru afișare
   useEffect(() => {
@@ -74,10 +77,23 @@ export default function DocumentForm({ registru, doc, role, comune, onSalvat, on
       payload.data_inreg = f.data_inreg
       payload.confidential = f.confidential
       payload.acces = f.confidential ? f.acces : []
+      if (circuit) payload.circuit_id = circuit.id
       res = await supabase.rpc('sec_inregistreaza', { p_registru: registru, p_date: payload })
     }
+    if (res.error) { setBusy(false); return setEroare(mesajEroare(res.error)) }
+    // Ieșire creată din Circuit: se copiază fișierul semnat (originalul rămâne neatins la documentul din Circuit)
+    if (!editare && circuit && prefill?.fisier) {
+      const nou = res.data
+      const ext = (prefill.fisier.path.split('.').pop() || 'pdf').toLowerCase()
+      const dest = `${nou.id}/${crypto.randomUUID()}.${ext}`
+      const c = await supabase.storage.from(BUCKET).copy(prefill.fisier.path, dest)
+      const v = c.error ? c : await supabase.rpc('sec_adauga_versiune', { p_doc: nou.id, p_path: dest, p_nume: prefill.fisier.nume })
+      if (v.error) {
+        setBusy(false)
+        return setAvertisment({ id: nou.id, mesaj: `Ieșirea a fost înregistrată ca ${nou.nr}/${nou.an}, dar fișierul semnat nu a putut fi copiat: ${mesajEroare(v.error)}. Deschide documentul și încarcă fișierul manual.` })
+      }
+    }
     setBusy(false)
-    if (res.error) return setEroare(mesajEroare(res.error))
     onSalvat(res.data.id)
   }
 
@@ -92,7 +108,18 @@ export default function DocumentForm({ registru, doc, role, comune, onSalvat, on
       {!editare && (
         <Info>Numărul se acordă automat la salvare. După înregistrare poți încărca scanul documentului.</Info>
       )}
+      {circuit && (
+        <Info>
+          Ieșire creată din documentul semnat {circuit.numar_afisat}.{prefill.fisier ? ' Fișierul semnat se copiază automat în această Ieșire la salvare.' : ' Documentul din Circuit nu are fișier încărcat, deci nu se copiază nimic.'}
+        </Info>
+      )}
       <Eroare>{eroare}</Eroare>
+      {avertisment && (
+        <div className="space-y-2">
+          <Eroare>{avertisment.mesaj}</Eroare>
+          <button type="button" className={btnGhost} onClick={() => onSalvat(avertisment.id)}>Deschide documentul</button>
+        </div>
+      )}
 
       <Card className="space-y-4">
         {!editare && (
