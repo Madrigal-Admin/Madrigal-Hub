@@ -151,7 +151,7 @@ function Numerotare({ admin }) {
                   <button className={btnPrimary} disabled={busy} onClick={() => seteaza(reg)}>Setează</button>
                 </div>
               )}
-              {admin && blocat && <p className="text-xs text-amber-700">Numărul de start nu mai poate fi schimbat: există deja documente.</p>}
+              {admin && blocat && <p className="text-xs text-amber-700">Numărul de start nu mai poate fi schimbat: există deja documente. Dacă sunt doar documente de test, șterge-le din pagina fiecărui document (secțiunea „Ștergere definitivă”); după ce registrul rămâne gol, câmpul se deblochează.</p>}
               {!admin && !blocat && <p className="text-xs text-slate-500">Numărul de start îl setează adminul Hub.</p>}
             </div>
           )
@@ -161,11 +161,34 @@ function Numerotare({ admin }) {
   )
 }
 
+// Urma ștergerilor definitive (doar Admin Hub): număr, cine, când, motiv — fără conținutul documentelor
+function JurnalStergeri() {
+  const [rows, setRows] = useState(null)
+  useEffect(() => {
+    supabase.from('sec_sters_jurnal').select('*').order('sters_la', { ascending: false }).limit(200).then(({ data }) => setRows(data || []))
+  }, [])
+  if (!rows || rows.length === 0) return null
+  return (
+    <Card className="space-y-2">
+      <h3 className="text-sm font-semibold text-slate-800">Jurnalul ștergerilor</h3>
+      <p className="text-xs text-slate-500">Numerele care lipsesc din registre. Se păstrează doar numărul, nu și conținutul documentului.</p>
+      <ul className="divide-y divide-slate-100 text-sm text-slate-700">
+        {rows.map((r) => (
+          <li key={r.id} className="py-1.5">
+            <span className="font-semibold">{r.numar_afisat}</span> · șters la {formatData(r.sters_la)} de {r.sters_de_nume || 'cont șters'} · {r.nr_fisiere} {r.nr_fisiere === 1 ? 'fișier' : 'fișiere'} · motiv: {r.motiv}
+          </li>
+        ))}
+      </ul>
+    </Card>
+  )
+}
+
 export default function Setari({ role, reload }) {
   return (
     <div className="space-y-4">
       <Titlu>Setări Secretariat</Titlu>
       <Numerotare admin={role === 'admin'} />
+      {role === 'admin' && <JurnalStergeri />}
       <div className="grid gap-4 lg:grid-cols-2">
         <ListEditor tabel="sec_canale" titlu="Canale de primire / moduri de transmitere" descriere="Ex. Poștă, Curier, E-mail. Se folosesc la Intrări și la Ieșiri." reload={reload} />
         <ListEditor tabel="sec_tipuri_document" titlu="Tipuri de document" descriere="Ex. Adresă, Cerere, Factură. Un element dezactivat rămâne la documentele vechi." reload={reload} />

@@ -8,6 +8,7 @@ import { Card, CasetaMotiv, Eroare, Info, ModSemnareBadge, StareBadge, Titlu, Va
 import { AngajatiMulti } from './Pickere'
 import Fisiere from './Fisiere'
 import CircuitSectiune from './CircuitSectiune'
+import StergereDocument from './StergereDocument'
 
 function descriereJurnal(j, comune) {
   const d = j.detalii || {}
@@ -355,6 +356,9 @@ export default function DocumentDetaliu({ id, role, comune, onInapoi, onEdit, on
           </button>
         </Card>
       )}
+
+      {/* Ștergere definitivă (doar Admin Hub) */}
+      {role === 'admin' && <StergereDocument doc={doc} onSters={onInapoi} />}
 
       {/* Jurnal (Secretariat / Conducere / Admin) */}
       {veziTot(role) && (
