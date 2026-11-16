@@ -3,7 +3,7 @@ import { ExternalLink, Upload } from 'lucide-react'
 import { deschideFisier, incarcaVersiune } from '../lib/fisiere'
 import { formatDataOra, formatMarime, mesajEroare } from '../lib/util'
 import { btnGhost, btnPrimary } from '../lib/ui'
-import { Card, Eroare, Info } from './comun'
+import { Eroare, Info, Sectiune } from './comun'
 
 // Fișierele unui document, cu versiuni. Versiunea înlocuită rămâne în istoric.
 export default function Fisiere({ doc, fisiere, poateIncarca, comune, reload }) {
@@ -43,18 +43,18 @@ export default function Fisiere({ doc, fisiere, poateIncarca, comune, reload }) 
   }
 
   return (
-    <Card className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-sm font-semibold text-slate-800">Fișiere</h3>
-        {poateIncarca && !inchis && (
-          <>
-            <input ref={input} type="file" accept="application/pdf,image/jpeg,image/png" className="hidden" onChange={alege} />
-            <button className={curenta ? btnGhost : btnPrimary} disabled={busy} onClick={() => input.current?.click()}>
-              <Upload size={14} /> {busy ? 'Se încarcă…' : curenta ? 'Încarcă versiune nouă' : 'Încarcă scanul / fișierul'}
-            </button>
-          </>
-        )}
-      </div>
+    <Sectiune
+      titlu="Fișiere"
+      className="space-y-3"
+      actiuni={poateIncarca && !inchis && (
+        <>
+          <input ref={input} type="file" accept="application/pdf,image/jpeg,image/png" className="hidden" onChange={alege} />
+          <button className={curenta ? btnGhost : btnPrimary} disabled={busy} onClick={() => input.current?.click()}>
+            <Upload size={14} /> {busy ? 'Se încarcă…' : curenta ? 'Încarcă versiune nouă' : 'Încarcă scanul / fișierul'}
+          </button>
+        </>
+      )}
+    >
 
       {poateIncarca && !inchis && (
         <p className="text-xs text-slate-500">
@@ -90,6 +90,6 @@ export default function Fisiere({ doc, fisiere, poateIncarca, comune, reload }) 
           ))}
         </ul>
       )}
-    </Card>
+    </Sectiune>
   )
 }

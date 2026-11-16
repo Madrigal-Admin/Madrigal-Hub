@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Check } from 'lucide-react'
 import { MOD_SEMNARE_SCURT, STARE_SEMNATAR, STATUSURI } from '../lib/roluri'
 import { btnGhost, btnPrimary, inputCls, labelCls } from '../lib/ui'
 
@@ -68,5 +69,70 @@ export function CasetaMotiv({ titlu, eticheta = 'Motiv', onConfirma, onRenunta, 
         <button onClick={onRenunta} className={btnGhost}>Renunță</button>
       </div>
     </div>
+  )
+}
+
+// ---- Elemente pentru paginile de detaliu (fără carduri: linii subțiri și spațiu) ----
+
+// Titlu de secțiune mic, cu acțiuni opționale în dreapta
+export function Sectiune({ titlu, actiuni, children, className = '' }) {
+  return (
+    <section className={className}>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{titlu}</h3>
+        {actiuni}
+      </div>
+      {children}
+    </section>
+  )
+}
+
+// Un rând etichetă–valoare dintr-o listă de detalii
+export function Rand({ eticheta, children }) {
+  return (
+    <div className="flex flex-wrap gap-x-4 border-b border-slate-100 py-2.5">
+      <dt className="w-40 flex-none text-[13px] font-semibold text-slate-500">{eticheta}</dt>
+      <dd className="min-w-0 flex-1 basis-48 text-sm text-slate-800">{children || <span className="text-slate-400">—</span>}</dd>
+    </div>
+  )
+}
+
+// Panoul din dreapta (stare, rezoluție, termen, locație, acțiuni rare)
+export function PanouLateral({ children }) {
+  return <aside className="w-full rounded-2xl bg-[#f4f7fb] p-5 lg:w-[360px] lg:flex-none">{children}</aside>
+}
+export function Linie() {
+  return <hr className="my-4 border-[#dbe3ee]" />
+}
+
+// Pașii de stare, pe verticală. Pasul curent e plin; cei dinaintea lui au bifă.
+// onPick(id) se apelează la clic pe un pas permis; fără onPick, pașii sunt doar de citit.
+export function PasiStare({ pasi, curent, rosu = false, permis, onPick }) {
+  return (
+    <ol className="space-y-0.5">
+      {pasi.map((p, i) => {
+        const plin = i <= curent
+        const esteCurent = i === curent
+        const clicabil = !!onPick && !esteCurent && (!permis || permis(p.id))
+        const culoare = esteCurent && rosu ? 'border-rose-700 bg-rose-700 text-white' : plin ? 'border-accent bg-accent text-white' : 'border-slate-300 bg-white text-slate-500'
+        return (
+          <li key={p.id}>
+            <button
+              type="button"
+              disabled={!clicabil}
+              aria-current={esteCurent ? 'step' : undefined}
+              onClick={() => onPick(p.id)}
+              className={`flex w-full items-center gap-3 rounded-lg py-1.5 text-left text-sm focus-ring ${clicabil ? 'cursor-pointer hover:bg-white/70' : 'cursor-default'} ${esteCurent ? 'font-bold text-slate-900' : 'font-medium text-slate-600'}`}
+            >
+              <span className={`inline-flex h-[26px] w-[26px] flex-none items-center justify-center rounded-full border-2 text-xs font-bold ${culoare}`}>
+                {i < curent ? <Check size={14} strokeWidth={3} aria-hidden="true" /> : i + 1}
+              </span>
+              <span className="min-w-0 flex-1">{p.label}</span>
+              {p.data && <span className="text-xs font-medium text-slate-500">{p.data}</span>}
+            </button>
+          </li>
+        )
+      })}
+    </ol>
   )
 }

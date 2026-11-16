@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { Trash2 } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { BUCKET } from '../lib/fisiere'
 import { REGISTRE } from '../lib/roluri'
@@ -52,14 +51,12 @@ export default function StergereDocument({ doc, onSters }) {
 
   if (!lant) {
     return (
-      <Card className="space-y-2 border-red-200">
-        <h3 className="text-sm font-semibold text-red-800">Ștergere definitivă (doar admin Hub)</h3>
-        <p className="text-xs text-slate-500">
-          Pentru înregistrări de test sau făcute din greșeală. Documentele reale se anulează, ca numărul să rămână în registru.
-        </p>
+      <>
         <Eroare>{eroare}</Eroare>
-        <button className={btnDanger} disabled={busy} onClick={deschide}><Trash2 size={14} /> Șterge definitiv…</button>
-      </Card>
+        <button className="text-left text-sm font-semibold text-rose-700 hover:underline focus-ring" disabled={busy} onClick={deschide}>
+          Șterge definitiv… (doar admin)
+        </button>
+      </>
     )
   }
 
