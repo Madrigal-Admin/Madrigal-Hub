@@ -7,6 +7,7 @@ export const ORDINE_PRIORITATE = { mare: 0, medie: 1, mica: 2 }
 
 // În liste se editează direct doar taskurile deschise de tine (și doar dacă nu sunt înghețate).
 export const poateEditaInLista = (ctx, t) =>
+  t.tip !== 'solicitare' &&
   t.creat_de === ctx.me.id &&
   ctx.poateGestiona(t) &&
   !ctx.inghetat(t) &&
@@ -14,7 +15,7 @@ export const poateEditaInLista = (ctx, t) =>
 
 // Ștergerea: aceeași regulă ca în fereastra taskului (cine gestionează taskul, dacă evenimentul nu e anulat).
 // Baza de date verifică oricum dreptul.
-export const poateSterge = (ctx, t) => ctx.poateGestiona(t) && !(t.tip === 'eveniment' && ctx.evenimentAnulat(t.eveniment_id))
+export const poateSterge = (ctx, t) => (t.tip === 'solicitare' ? ctx.admin : ctx.poateGestiona(t)) && !(t.tip === 'eveniment' && ctx.evenimentAnulat(t.eveniment_id))
 
 // Șterge definitiv taskuri. Întoarce un mesaj de eroare, sau '' dacă a mers.
 export async function stergeTaskuri(ids) {

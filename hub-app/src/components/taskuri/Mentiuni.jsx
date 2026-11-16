@@ -7,7 +7,7 @@ const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
 // Persoanele care sigur văd taskul (deci pot fi menționate): responsabil, cine l-a deschis, colaboratori, PM-ii evenimentului.
 export function candidatiMentiune(ctx, task) {
-  const ids = new Set([task.responsabil_id, task.creat_de, ...(ctx.colabDupaTask[task.id] || []), ...(ctx.evMap[task.eveniment_id]?.pm || [])])
+  const ids = new Set([task.responsabil_id, task.creat_de, ...(ctx.colabDupaTask[task.id] || []), ...(ctx.evMap[task.eveniment_id]?.pm || []), ...(task.tip === 'solicitare' ? (ctx.membriDest || []).filter((m) => m.destinatie_id === task.destinatie_id).map((m) => m.angajat_id) : [])])
   ids.delete(ctx.me.id)
   ids.delete(null)
   ids.delete(undefined)

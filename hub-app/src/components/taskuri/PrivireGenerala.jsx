@@ -66,7 +66,7 @@ export default function PrivireGenerala({ ctx, onClose }) {
           total: t.length,
           gata: t.filter((x) => x.status === 'terminat').length,
           intarziate: t.filter(esteIntarziat).length,
-          faraResp: t.filter((x) => esteDeschis(x) && !x.responsabil_id).length,
+          faraResp: t.filter((x) => esteDeschis(x) && x.tip !== 'solicitare' && !x.responsabil_id).length,
         }
       })
   }, [ctx, arataToate])

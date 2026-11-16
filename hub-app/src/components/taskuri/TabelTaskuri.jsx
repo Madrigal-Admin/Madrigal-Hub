@@ -30,6 +30,12 @@ function Eticheta({ t, ctx, arataEveniment, arataTag }) {
       {arataEveniment && t.tip === 'operational' && (
         <span className="shrink-0 rounded-md border border-[#9AA6B8] px-2 py-0.5 text-xs font-semibold text-[#3A465C]">{ctx.grupMap?.[t.grup_id]?.nume || 'Operațional'}</span>
       )}
+      {t.tip === 'solicitare' && (
+        <span className="shrink-0 rounded-md bg-[#E4ECF8] px-2 py-0.5 text-xs font-semibold text-[#22406B]">{ctx.eticheta(t)}</span>
+      )}
+      {arataEveniment && t.tip === 'solicitare' && ctx.evMap?.[t.eveniment_id] && (
+        <span className="max-w-[200px] shrink-0 truncate rounded-md bg-cream px-2 py-0.5 text-xs font-semibold text-[#172036]" title={ctx.evMap[t.eveniment_id].nume}>{ctx.evMap[t.eveniment_id].nume}</span>
+      )}
       {arataTag && t.tag && <span className="shrink-0 rounded-md bg-[#F1F3F7] px-2 py-0.5 text-xs font-semibold text-[#3A465C]">{t.tag}</span>}
     </>
   )
@@ -157,7 +163,7 @@ export default function TabelTaskuri({ taskuri, ctx, onOpen, onEroare, arataEven
     )
     const aleasa = selectate.has(t.id)
     const dd = (
-      <StatusDropdown compact status={t.status} poate={!doarCitire && ctx.poateSchimbaStatus(t) && !ctx.inghetat(t) && !ctx.evenimentAnulat(t.eveniment_id)} poateAnula={!doarCitire && ctx.poateGestiona(t)} onChange={(s) => seteaza(t, s)} />
+      <StatusDropdown compact status={t.status} poate={!doarCitire && ctx.poateSchimbaStatus(t) && !ctx.inghetat(t) && !ctx.evenimentAnulat(t.eveniment_id)} poateAnula={!doarCitire && ctx.poateAnula(t)} onChange={(s) => seteaza(t, s)} />
     )
     const celula = (tip) => <CelulaEditabila tip={tip} task={t} ctx={ctx} poate={editabil} onEroare={onEroare} />
     return (
@@ -184,9 +190,9 @@ export default function TabelTaskuri({ taskuri, ctx, onOpen, onEroare, arataEven
           {vizibile.map((k) => (
             <div key={k} className="min-w-0 truncate text-[13px] text-[#172036]">
               {k === 'deadline' && <span className="font-bold">{celula('data')}</span>}
-              {k === 'responsabil' && celula('responsabil')}
+              {k === 'responsabil' && (t.tip === 'solicitare' ? <span className="text-[#3A465C]">{ctx.destMap[t.destinatie_id]?.nume || 'Echipa Media'}</span> : celula('responsabil'))}
               {k === 'tag' && celula('tag')}
-              {k === 'grup' && <span title={ctx.grupMap?.[t.grup_id]?.nume || t.tag || ''}>{ctx.grupMap?.[t.grup_id]?.nume || t.tag || '—'}</span>}
+              {k === 'grup' && <span title={ctx.grupMap?.[t.grup_id]?.nume || t.tag || ''}>{t.tip === 'solicitare' ? ctx.eticheta(t) : ctx.grupMap?.[t.grup_id]?.nume || t.tag || '—'}</span>}
               {k === 'prioritate' && <span className="text-[#5B6578]">{celula('prioritate')}</span>}
               {k === 'deschis' && <span title={t.creat_de ? ctx.nume(t.creat_de) : ''}>{t.creat_de ? ctx.nume(t.creat_de) : '—'}</span>}
             </div>

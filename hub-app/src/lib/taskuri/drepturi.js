@@ -25,6 +25,19 @@ export function construiesteCtx(date, me, rol) {
   const evenimentAnulat = (evId) => comportament(evId) === 'anulat'
   const pmLaEveniment = (evId) => !!evMap[evId]?.pm.includes(me.id)
 
+  // Taskuri Media (solicitări): destinațiile din care fac parte (ex. contul „Echipa Media")
+  const destinatiiMele = new Set((date.membriDest || []).filter((m) => m.angajat_id === me.id).map((m) => m.destinatie_id))
+  const eMembru = (t) => t.tip === 'solicitare' && destinatiiMele.has(t.destinatie_id)
+  const destMap = Object.fromEntries((date.destinatii || []).map((d) => [d.id, d]))
+  const categMap = Object.fromEntries((date.categorii || []).map((c) => [c.id, c]))
+  // Categoriile în care pot deschide taskuri: aceleași reguli ca la taskurile normale (admin / PM / coordonator)
+  const poateCreaSolicitare = admin || sunPm || sunCoordonator
+  const categoriiActive = (date.categorii || [])
+    .filter((c) => c.activ && destMap[c.destinatie_id]?.activ)
+    .map((c) => ({ ...c, destinatie: destMap[c.destinatie_id] }))
+  const campuriCategorie = (categorieId) => (date.sabloane || []).filter((s) => s.categorie_id === categorieId).sort((a, b) => a.ordine - b.ordine)
+  const eticheta = (t) => (t.tip === 'solicitare' ? `${destMap[t.destinatie_id]?.nume || 'Media'} · ${categMap[t.categorie_id]?.nume || 'Solicitare'}` : '')
+
   const poateGestiona = (t) =>
     admin ||
     t.creat_de === me.id ||
@@ -34,10 +47,15 @@ export function construiesteCtx(date, me, rol) {
     poateGestiona(t) ||
     (t.responsabil_id && oamenii.has(t.responsabil_id)) ||
     (t.responsabil_id === me.id && sunCoordonator)
+  // La taskurile Media statusul îl schimbă doar echipa destinatară (și adminul); cel care a deschis taskul îl poate doar anula.
+  const poateAnula = (t) =>
+    t.tip === 'solicitare' ? admin || (t.creat_de === me.id && (t.status === 'de_facut' || t.status === 'in_lucru')) : poateGestiona(t)
   const poateSchimbaStatus = (t) =>
+    t.tip === 'solicitare' ? admin || eMembru(t) :
     poateGestiona(t) || t.responsabil_id === me.id || (colabDupaTask[t.id] || []).includes(me.id)
   const inghetat = (t) => t.tip === 'eveniment' && evenimentAnulat(t.eveniment_id) && t.status === 'anulat'
 
+  const taskuriPrimite = date.taskuri.filter(eMembru)
   const taskuriMele = date.taskuri.filter(
     (t) => t.responsabil_id === me.id || t.creat_de === me.id || (colabDupaTask[t.id] || []).includes(me.id)
   )
@@ -51,6 +69,7 @@ export function construiesteCtx(date, me, rol) {
     angajatiMap, grupMap, evMap, statusMap,
     grupuriCoordonate, evenimenteMele, sunPm, sunCoordonator,
     colabDupaTask, comportament, evenimentAnulat, pmLaEveniment,
+    destinatiiMele, eMembru, destMap, categMap, poateCreaSolicitare, categoriiActive, campuriCategorie, eticheta, poateAnula, taskuriPrimite,
     poateGestiona, poateDelega, poateSchimbaStatus, inghetat,
     taskuriMele, taskuriDepartament,
     nume: (id) => angajatiMap[id]?.nume_complet || '—',

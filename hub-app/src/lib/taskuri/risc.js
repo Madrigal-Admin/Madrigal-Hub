@@ -21,8 +21,9 @@ export function riscEveniment(ev, taskuri) {
   const zile = ev?.data ? zileIntre(a, ev.data) : 999
   const sfarsit = ev?.data_sfarsit || ev?.data
   const zileDeLaSfarsit = sfarsit ? zileIntre(sfarsit, a) : 0 // > 0 = evenimentul s-a încheiat deja
-  const total = taskuri.filter((t) => t.eveniment_id === ev.id && t.status !== 'anulat').length
-  const deschise = taskuri.filter((t) => t.eveniment_id === ev.id && (t.status === 'de_facut' || t.status === 'in_lucru'))
+  // taskurile Media nu intră în semafor (n-au responsabil, nu blochează evenimentul)
+  const total = taskuri.filter((t) => t.eveniment_id === ev.id && t.tip !== 'solicitare' && t.status !== 'anulat').length
+  const deschise = taskuri.filter((t) => t.eveniment_id === ev.id && t.tip !== 'solicitare' && (t.status === 'de_facut' || t.status === 'in_lucru'))
   const intarziate = deschise.filter((t) => t.termen && t.termen < a).length
   const faraResp = deschise.filter((t) => !t.responsabil_id).length
   const faraTermen = deschise.filter((t) => !t.termen).length
@@ -44,5 +45,5 @@ export const textZile = (z, dupa = 0) => (dupa > 0 ? `încheiat acum ${dupa} ${d
 // Taskurile deschise, fără responsabil, ale evenimentelor date.
 export function deAlocat(taskuri, evenimente) {
   const ids = new Set(evenimente.map((e) => e.id))
-  return taskuri.filter((t) => ids.has(t.eveniment_id) && !t.responsabil_id && (t.status === 'de_facut' || t.status === 'in_lucru'))
+  return taskuri.filter((t) => ids.has(t.eveniment_id) && t.tip !== 'solicitare' && !t.responsabil_id && (t.status === 'de_facut' || t.status === 'in_lucru'))
 }

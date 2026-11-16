@@ -49,7 +49,8 @@ export default function Evenimente({ ctx, evenimente, onOpen, onTaskNou, onCheck
   const renderCard = (e) => {
     const st = ctx.statusMap[e.status]
     const comp = st?.comportament
-    const taskuri = ctx.taskuri.filter((t) => t.eveniment_id === e.id)
+    const toateTaskurile = ctx.taskuri.filter((t) => t.eveniment_id === e.id)
+    const taskuri = toateTaskurile.filter((t) => t.tip !== 'solicitare') // taskurile Media nu intră în progres și nu blochează finalizarea
     const valide = taskuri.filter((t) => t.status !== 'anulat')
     const gata = valide.filter((t) => t.status === 'terminat').length
     const deschiseNr = taskuri.filter(estePrelucrat).length
@@ -101,8 +102,8 @@ export default function Evenimente({ ctx, evenimente, onOpen, onTaskNou, onCheck
         )}
         {comp === 'anulat' && <p className="px-5 pb-3 text-xs text-rose-600">Eveniment anulat — taskurile lui sunt înghețate.</p>}
 
-        {!strans && taskuri.length > 0 && <TabelTaskuri taskuri={taskuri} ctx={ctx} onOpen={onOpen} onEroare={setEroare} bara={false} />}
-        {!strans && taskuri.length === 0 && (
+        {!strans && toateTaskurile.length > 0 && <TabelTaskuri taskuri={toateTaskurile} ctx={ctx} onOpen={onOpen} onEroare={setEroare} bara={false} />}
+        {!strans && toateTaskurile.length === 0 && (
           <p className="border-t border-[#EEF0F4] px-5 py-3 text-[13px] text-[#5B6578] sm:pl-[46px]">
             {comp === 'deschis' ? 'Niciun task încă. Vei alege din checklist taskurile necesare când pornești organizarea.' : 'Niciun task la acest eveniment.'}
           </p>

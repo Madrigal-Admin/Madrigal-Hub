@@ -10,7 +10,7 @@ export const mutaData = (s, n) => new Date(ms(s) + n * MS_ZI).toISOString().slic
 // Taskurile pe care utilizatorul le poate decala: deschise, cu termen, negestionate de altcineva, neînghețate.
 export function taskuriDecalabile(ctx, eveniment_id) {
   if (!ctx || ctx.evenimentAnulat(eveniment_id)) return []
-  return ctx.taskuri.filter((t) => t.eveniment_id === eveniment_id && (t.status === 'de_facut' || t.status === 'in_lucru') && t.termen && ctx.poateGestiona(t) && !ctx.inghetat(t))
+  return ctx.taskuri.filter((t) => t.eveniment_id === eveniment_id && t.tip !== 'solicitare' && (t.status === 'de_facut' || t.status === 'in_lucru') && t.termen && ctx.poateGestiona(t) && !ctx.inghetat(t))
 }
 
 // Fereastra „Decalezi termenele?" – apare după ce data unui eveniment a fost schimbată.

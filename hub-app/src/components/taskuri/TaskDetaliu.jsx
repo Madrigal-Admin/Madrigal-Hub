@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { ExternalLink, Trash2 } from 'lucide-react'
 import { supabase } from '../../supabaseClient'
 import { esteIntarziat, formatData, formatDataOra, inputCls, mesajEroare } from '../../lib/taskuri/ui'
+import { dataRo } from '../../lib/taskuri/solicitari'
 import { actualizeaza } from '../../lib/taskuri/editare'
 import { Modal } from './Mici'
 import StatusDropdown from './StatusDropdown'
@@ -32,6 +33,47 @@ function Descriere({ task, ctx, poate, onEroare }) {
   return <textarea autoFocus rows={4} className={inputCls} value={text} onChange={(e) => setText(e.target.value)} onBlur={salveaza} onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setEdit(false) } }} />
 }
 
+// Zona „Livrare" a unui task Media: echipa Media (și adminul) pune linkul; cel care a deschis taskul îl vede imediat.
+function Livrare({ task, ctx, poate, onEroare }) {
+  const [link, setLink] = useState(task.link_livrare || '')
+  const [busy, setBusy] = useState(false)
+  useEffect(() => { setLink(task.link_livrare || '') }, [task.link_livrare])
+  async function salveaza(e) {
+    e.preventDefault()
+    const v = link.trim()
+    if (!/^https?:\/\/\S+$/i.test(v)) return onEroare('Linkul de livrare trebuie să înceapă cu http:// sau https://.')
+    onEroare('')
+    setBusy(true)
+    const patch = { link_livrare: v, ...(task.status !== 'terminat' ? { status: 'terminat' } : {}) }
+    const err = await actualizeaza(task.id, patch)
+    setBusy(false)
+    if (err) return onEroare(err)
+    await ctx.reload()
+  }
+  if (!poate && !task.link_livrare) {
+    return <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-500">Materialele nu au fost încă livrate. Linkul apare aici când echipa Media îl adaugă.</p>
+  }
+  return (
+    <div className="rounded-xl border border-[#D5DAE3] bg-[#F6F8FB] p-3.5">
+      <p className="mb-1.5 text-sm font-semibold text-slate-800">Link livrare materiale</p>
+      {task.link_livrare && (
+        <p className="mb-2 text-sm">
+          <a href={task.link_livrare} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 break-all font-semibold text-accent hover:underline">{task.link_livrare} <ExternalLink size={13} /></a>
+          {task.livrat_la && <span className="ml-2 text-xs text-slate-500">adăugat la {formatDataOra(task.livrat_la)}</span>}
+        </p>
+      )}
+      {poate && (
+        <form onSubmit={salveaza} className="flex flex-wrap gap-2">
+          <input className={`${inputCls} min-w-0 flex-1`} placeholder="https://…" value={link} onChange={(e) => setLink(e.target.value)} />
+          <button type="submit" disabled={busy || !link.trim()} className="shrink-0 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50">
+            {task.status === 'terminat' ? 'Actualizează linkul' : 'Salvează și marchează „Terminat”'}
+          </button>
+        </form>
+      )}
+    </div>
+  )
+}
+
 export default function TaskDetaliu({ taskId, ctx, onClose }) {
   const task = ctx.taskuri.find((t) => t.id === taskId)
   const [comentarii, setComentarii] = useState([])
@@ -59,7 +101,8 @@ export default function TaskDetaliu({ taskId, ctx, onClose }) {
 
   const ev = ctx.evMap[task.eveniment_id]
   const evAnulat = task.tip === 'eveniment' && ctx.evenimentAnulat(task.eveniment_id)
-  const gestioneaza = ctx.poateGestiona(task) && !evAnulat
+  const esteSol = task.tip === 'solicitare'
+  const gestioneaza = (esteSol ? ctx.admin : ctx.poateGestiona(task)) && !evAnulat
   const poateStatus = ctx.poateSchimbaStatus(task) && !evAnulat
   const colab = ctx.colabDupaTask[task.id] || []
 
@@ -104,6 +147,12 @@ export default function TaskDetaliu({ taskId, ctx, onClose }) {
     incarcaComentarii()
   }
 
+  async function anuleazaSolicitare() {
+    if (!window.confirm('Anulezi acest task Media? Echipa Media va vedea un comentariu că taskul a fost anulat.')) return
+    await status('anulat')
+    incarcaComentarii()
+  }
+
   async function stergeTask() {
     if (!window.confirm(`Ștergi definitiv taskul „${task.titlu}"? Nu se poate reveni. Dacă vrei doar să-l oprești, folosește „Anulează".`)) return
     const { error } = await supabase.from('tsk_taskuri').delete().eq('id', task.id)
@@ -112,8 +161,8 @@ export default function TaskDetaliu({ taskId, ctx, onClose }) {
     onClose()
   }
 
-  const rand = (eticheta, continut) => (
-    <div className="flex gap-3 py-1.5 text-sm">
+  const rand = (eticheta, continut, cheie) => (
+    <div key={cheie} className="flex gap-3 py-1.5 text-sm">
       <span className="w-28 shrink-0 text-slate-500">{eticheta}</span>
       <span className="min-w-0 flex-1 text-slate-800">{continut}</span>
     </div>
@@ -131,6 +180,18 @@ export default function TaskDetaliu({ taskId, ctx, onClose }) {
       )}
       {gestioneaza && <p className="mb-2 text-xs text-slate-400">Click pe un câmp ca să-l modifici; se salvează singur.</p>}
 
+      {esteSol ? (
+        <div className="divide-y divide-slate-100">
+          {rand('Status', <StatusDropdown status={task.status} poate={poateStatus} poateAnula={ctx.poateAnula(task)} onChange={status} />)}
+          {rand('Tip', ctx.eticheta(task))}
+          {rand('Termen', camp('data'))}
+          {rand('Prioritate', camp('prioritate'))}
+          {task.eveniment_id && rand('Eveniment', ev ? `${ev.nume} · ${formatData(ev.data)}` : '—')}
+          {(task.date_solicitare || []).map((p) => rand(p.eticheta, <span className="whitespace-pre-wrap">{p.tip === 'link' ? <a href={p.valoare} target="_blank" rel="noopener noreferrer" className="break-all text-accent hover:underline">{p.valoare}</a> : p.valoare}</span>, p.cheie))}
+          {rand('Descriere', <Descriere task={task} ctx={ctx} poate={gestioneaza} onEroare={setEroare} />)}
+          {rand('Deschis de', `${task.creat_de ? ctx.nume(task.creat_de) : '—'} · ${dataRo(task.created_at?.slice(0, 10))}`)}
+        </div>
+      ) : (
       <div className="divide-y divide-slate-100">
         {rand('Status', <StatusDropdown status={task.status} poate={poateStatus && !ctx.inghetat(task)} poateAnula={ctx.poateGestiona(task)} onChange={status} />)}
         {rand('Responsabil', camp('responsabil'))}
@@ -154,6 +215,17 @@ export default function TaskDetaliu({ taskId, ctx, onClose }) {
         ))}
         {rand('Creat de', `${task.creat_de ? ctx.nume(task.creat_de) : '—'} · ${formatDataOra(task.created_at)}`)}
       </div>
+
+      )}
+
+      {esteSol && (
+        <div className="mt-4 space-y-3">
+          <Livrare task={task} ctx={ctx} poate={(ctx.admin || ctx.eMembru(task)) && task.status !== 'anulat'} onEroare={setEroare} />
+          {ctx.poateAnula(task) && !ctx.admin && (
+            <button type="button" onClick={anuleazaSolicitare} className="rounded-lg border border-rose-200 px-3 py-1.5 text-sm font-medium text-rose-700 hover:bg-rose-50">Anulează taskul</button>
+          )}
+        </div>
+      )}
 
       {gestioneaza && (
         <div className="mt-3 flex gap-2">
