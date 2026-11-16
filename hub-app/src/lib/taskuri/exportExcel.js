@@ -13,7 +13,7 @@ export async function exportaTaskuri(taskuri, ctx, filtre = [], numeFisier = 'ta
     return [
       t.titlu,
       STATUS_DUPA_COD[t.status]?.nume || t.status,
-      t.tip === 'solicitare' ? ctx.destMap?.[t.destinatie_id]?.nume || '' : t.responsabil_id ? ctx.nume(t.responsabil_id) : '',
+      t.responsabil_id ? ctx.nume(t.responsabil_id) : '',
       data(t.termen),
       PRIORITATE_DUPA_COD[t.prioritate]?.nume || '',
       t.tag || '',

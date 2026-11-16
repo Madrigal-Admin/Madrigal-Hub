@@ -31,6 +31,11 @@ export async function actualizeaza(id, patch) {
 
 // Cine poate fi responsabil pentru un task (același regulă ca în formular).
 export function optiuniResponsabil(ctx, t) {
+  // taskul Media: doar conturile permise pentru categoria lui
+  if (t.tip === 'solicitare') {
+    const ids = new Set(ctx.responsabiliCategorie(t.categorie_id).map((r) => r.angajat_id))
+    return ctx.angajatiCuAcces.filter((a) => ids.has(a.id))
+  }
   let lista = ctx.angajatiCuAcces
   if (t.tip === 'operational' && t.grup_id && !ctx.admin) {
     const ids = new Set(ctx.membri.filter((m) => m.grup_id === t.grup_id).map((m) => m.angajat_id))

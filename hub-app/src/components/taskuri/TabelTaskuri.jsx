@@ -190,7 +190,7 @@ export default function TabelTaskuri({ taskuri, ctx, onOpen, onEroare, arataEven
           {vizibile.map((k) => (
             <div key={k} className="min-w-0 truncate text-[13px] text-[#172036]">
               {k === 'deadline' && <span className="font-bold">{celula('data')}</span>}
-              {k === 'responsabil' && (t.tip === 'solicitare' ? <span className="text-[#3A465C]">{ctx.destMap[t.destinatie_id]?.nume || 'Echipa Media'}</span> : celula('responsabil'))}
+              {k === 'responsabil' && celula('responsabil')}
               {k === 'tag' && celula('tag')}
               {k === 'grup' && <span title={ctx.grupMap?.[t.grup_id]?.nume || t.tag || ''}>{t.tip === 'solicitare' ? ctx.eticheta(t) : ctx.grupMap?.[t.grup_id]?.nume || t.tag || '—'}</span>}
               {k === 'prioritate' && <span className="text-[#5B6578]">{celula('prioritate')}</span>}

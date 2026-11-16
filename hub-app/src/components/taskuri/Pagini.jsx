@@ -5,7 +5,7 @@ import TaskLista from './TaskLista'
 import TaguriAdmin from './TaguriAdmin'
 import GrupuriAdmin from './GrupuriAdmin'
 import ChecklistAdmin from './ChecklistAdmin'
-import DestinatiiAdmin from './DestinatiiAdmin'
+import StructuraTask from './StructuraTask'
 import DashboardEchipa from './DashboardEchipa'
 import DashboardEvenimente from './DashboardTaskuri'
 import SelectorEvenimente from './SelectorEvenimente'
@@ -78,7 +78,7 @@ export function PaginaDepartament() {
   const grupAles = grupuri.some((g) => g.id === grup) ? grup : ''
   const idsGrupuri = new Set(grupAles ? [grupAles] : grupuri.map((g) => g.id))
   const idsMembri = new Set(ctx.membri.filter((m) => idsGrupuri.has(m.grup_id)).map((m) => m.angajat_id))
-  const baza = ctx.admin ? ctx.taskuri.filter((t) => t.tip === 'operational') : ctx.taskuriDepartament
+  const baza = ctx.admin ? ctx.taskuri.filter((t) => t.tip === 'operational' || t.tip === 'solicitare') : ctx.taskuriDepartament
   const taskuri = baza.filter((t) => (t.grup_id && idsGrupuri.has(t.grup_id)) || (t.responsabil_id && idsMembri.has(t.responsabil_id)))
   return (
     <Cadru
@@ -113,7 +113,7 @@ export function PaginaSetari() {
   const [tab, setTab] = useState('toate')
   if (!ctx) return <Incarca />
   if (!ctx.admin) return <Cadru titlu="Setări Taskuri"><p className="text-sm text-slate-500">Nu ai acces la această pagină.</p></Cadru>
-  const taburi = [['toate', 'Toate taskurile'], ['grupuri', 'Departamente'], ['checklist', 'Checklist'], ['taguri', 'Taguri'], ['destinatii', 'Destinații']]
+  const taburi = [['toate', 'Toate taskurile'], ['grupuri', 'Departamente'], ['checklist', 'Checklist'], ['taguri', 'Taguri'], ['structura', 'Structură task']]
   return (
     <Cadru titlu="Setări Taskuri" descriere="Departamente, checklistul de organizare și vedere de ansamblu asupra taskurilor.">
       <div className="mb-5 flex flex-wrap gap-1 self-start rounded-lg bg-slate-100 p-1 text-sm">
@@ -126,7 +126,7 @@ export function PaginaSetari() {
       {tab === 'toate' && <TaskLista taskuri={ctx.taskuri} ctx={ctx} onOpen={(t) => acte.deschideTask(t.id)} />}
       {tab === 'grupuri' && <GrupuriAdmin ctx={ctx} />}
       {tab === 'checklist' && <ChecklistAdmin ctx={ctx} />}
-      {tab === 'destinatii' && <DestinatiiAdmin ctx={ctx} />}
+      {tab === 'structura' && <StructuraTask ctx={ctx} />}
       {tab === 'taguri' && <TaguriAdmin ctx={ctx} onChecklist={() => setTab('checklist')} />}
     </Cadru>
   )

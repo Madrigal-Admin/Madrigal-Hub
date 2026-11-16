@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { ExternalLink, Trash2 } from 'lucide-react'
 import { supabase } from '../../supabaseClient'
 import { esteIntarziat, formatData, formatDataOra, inputCls, mesajEroare } from '../../lib/taskuri/ui'
-import { dataRo } from '../../lib/taskuri/solicitari'
+import { dataRo, construiestePerechi, valideazaCampuri } from '../../lib/taskuri/solicitari'
+import CampuriSolicitare from './CampuriSolicitare'
 import { actualizeaza } from '../../lib/taskuri/editare'
 import { Modal } from './Mici'
 import StatusDropdown from './StatusDropdown'
@@ -31,6 +32,39 @@ function Descriere({ task, ctx, poate, onEroare }) {
     )
   }
   return <textarea autoFocus rows={4} className={inputCls} value={text} onChange={(e) => setText(e.target.value)} onBlur={salveaza} onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setEdit(false) } }} />
+}
+
+// Modificarea câmpurilor suplimentare ale unui task de eveniment / operațional (cele ale taskurilor Media se blochează după trimitere)
+function EditorCampuri({ task, ctx, onClose, onEroare }) {
+  const campuri = ctx.campuriCategorie(ctx.categorieTip(task.tip)?.id)
+  const [valori, setValori] = useState(() => Object.fromEntries((task.date_campuri || []).filter((p) => p.brut !== undefined).map((p) => [p.cheie, p.brut])))
+  const [eroare, setEroare] = useState('')
+  const [busy, setBusy] = useState(false)
+  async function salveaza(e) {
+    e.preventDefault()
+    const gresit = valideazaCampuri(campuri, valori)
+    if (gresit) return setEroare(gresit)
+    setBusy(true)
+    // câmpurile dezactivate între timp rămân cum erau
+    const pastrate = (task.date_campuri || []).filter((p) => !campuri.some((c) => c.activ && c.cheie === p.cheie))
+    const err = await actualizeaza(task.id, { date_campuri: [...construiestePerechi(campuri, valori, ctx, null), ...pastrate] })
+    setBusy(false)
+    if (err) return setEroare(err)
+    await ctx.reload()
+    onClose()
+  }
+  return (
+    <Modal titlu="Câmpuri suplimentare" onClose={onClose} esc={false}>
+      <form onSubmit={salveaza} className="space-y-4">
+        <CampuriSolicitare campuri={campuri} valori={valori} setValoare={(k, v) => setValori((p) => ({ ...p, [k]: v }))} ctx={ctx} eveniment={null} />
+        {eroare && <p className="text-sm text-rose-600">{eroare}</p>}
+        <div className="flex justify-end gap-2">
+          <button type="button" onClick={onClose} className="rounded-lg px-4 py-2 text-sm text-slate-600 hover:bg-slate-100">Renunță</button>
+          <button type="submit" disabled={busy} className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-white hover:bg-accent-hover disabled:opacity-50">{busy ? 'Se salvează…' : 'Salvează'}</button>
+        </div>
+      </form>
+    </Modal>
+  )
 }
 
 // Zona „Livrare" a unui task Media: echipa Media (și adminul) pune linkul; cel care a deschis taskul îl vede imediat.
@@ -102,6 +136,7 @@ export default function TaskDetaliu({ taskId, ctx, onClose }) {
   const ev = ctx.evMap[task.eveniment_id]
   const evAnulat = task.tip === 'eveniment' && ctx.evenimentAnulat(task.eveniment_id)
   const esteSol = task.tip === 'solicitare'
+  const [editCampuri, setEditCampuri] = useState(false)
   const gestioneaza = (esteSol ? ctx.admin : ctx.poateGestiona(task)) && !evAnulat
   const poateStatus = ctx.poateSchimbaStatus(task) && !evAnulat
   const colab = ctx.colabDupaTask[task.id] || []
@@ -184,10 +219,11 @@ export default function TaskDetaliu({ taskId, ctx, onClose }) {
         <div className="divide-y divide-slate-100">
           {rand('Status', <StatusDropdown status={task.status} poate={poateStatus} poateAnula={ctx.poateAnula(task)} onChange={status} />)}
           {rand('Tip', ctx.eticheta(task))}
+          {rand('Responsabil', camp('responsabil'))}
           {rand('Termen', camp('data'))}
           {rand('Prioritate', camp('prioritate'))}
           {task.eveniment_id && rand('Eveniment', ev ? `${ev.nume} · ${formatData(ev.data)}` : '—')}
-          {(task.date_solicitare || []).map((p) => rand(p.eticheta, <span className="whitespace-pre-wrap">{p.tip === 'link' ? <a href={p.valoare} target="_blank" rel="noopener noreferrer" className="break-all text-accent hover:underline">{p.valoare}</a> : p.valoare}</span>, p.cheie))}
+          {(task.date_campuri || []).map((p) => rand(p.eticheta, <span className="whitespace-pre-wrap">{p.tip === 'link' ? <a href={p.valoare} target="_blank" rel="noopener noreferrer" className="break-all text-accent hover:underline">{p.valoare}</a> : p.valoare}</span>, p.cheie))}
           {rand('Descriere', <Descriere task={task} ctx={ctx} poate={gestioneaza} onEroare={setEroare} />)}
           {rand('Deschis de', `${task.creat_de ? ctx.nume(task.creat_de) : '—'} · ${dataRo(task.created_at?.slice(0, 10))}`)}
         </div>
@@ -199,6 +235,10 @@ export default function TaskDetaliu({ taskId, ctx, onClose }) {
         {rand('Tag', camp('tag'))}
         {rand('Descriere', <Descriere task={task} ctx={ctx} poate={gestioneaza} onEroare={setEroare} />)}
         {rand('Prioritate', camp('prioritate'))}
+        {(task.date_campuri || []).map((p) => rand(p.eticheta, <span className="whitespace-pre-wrap">{p.tip === 'link' ? <a href={p.valoare} target="_blank" rel="noopener noreferrer" className="break-all text-accent hover:underline">{p.valoare}</a> : p.valoare}</span>, p.cheie))}
+        {gestioneaza && ctx.campuriCategorie(ctx.categorieTip(task.tip)?.id).some((c) => c.activ) && (
+          <div className="py-1.5"><button type="button" onClick={() => setEditCampuri(true)} className="text-sm font-semibold text-accent hover:underline">Modifică câmpurile suplimentare</button></div>
+        )}
         {rand('Tip', task.tip === 'eveniment' ? 'Task de eveniment' : 'Task operațional')}
         {task.tip === 'eveniment' && rand('Eveniment', ev ? `${ev.nume} · ${formatData(ev.data)}` : '—')}
         {task.grup_id && rand('Departament', ctx.grupMap[task.grup_id]?.nume)}
@@ -220,7 +260,7 @@ export default function TaskDetaliu({ taskId, ctx, onClose }) {
 
       {esteSol && (
         <div className="mt-4 space-y-3">
-          <Livrare task={task} ctx={ctx} poate={(ctx.admin || ctx.eMembru(task)) && task.status !== 'anulat'} onEroare={setEroare} />
+          <Livrare task={task} ctx={ctx} poate={ctx.poateSchimbaStatus(task) && task.status !== 'anulat'} onEroare={setEroare} />
           {ctx.poateAnula(task) && !ctx.admin && (
             <button type="button" onClick={anuleazaSolicitare} className="rounded-lg border border-rose-200 px-3 py-1.5 text-sm font-medium text-rose-700 hover:bg-rose-50">Anulează taskul</button>
           )}
@@ -261,6 +301,7 @@ export default function TaskDetaliu({ taskId, ctx, onClose }) {
         </form>
         <IstoricTask ctx={ctx} task={task} />
       </div>
+      {editCampuri && <EditorCampuri task={task} ctx={ctx} onClose={() => setEditCampuri(false)} onEroare={setEroare} />}
     </Modal>
   )
 }

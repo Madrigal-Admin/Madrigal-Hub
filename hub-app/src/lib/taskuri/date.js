@@ -12,16 +12,14 @@ async function toate(tabel, select = '*', ord = 'id') {
   return out
 }
 
-// Tabelele pentru taskurile Media (migrarea 22). Dacă migrarea nu e rulată încă, lista rămâne goală și restul Hub-ului merge ca înainte.
+// Tabelele de structură: categorii (cu departament destinatar), câmpuri suplimentare (migrările 22–23). Dacă migrarea nu e rulată încă, lista rămâne goală și restul Hub-ului merge ca înainte.
 async function toateOpt(tabel, ord) {
   try { return await toate(tabel, '*', ord) } catch { return [] }
 }
 
 export async function incarcaTaskuri() {
-  const [destinatii, membriDest, categorii, sabloane] = await Promise.all([
-    toateOpt('tsk_destinatii', 'ordine'),
-    toateOpt('tsk_destinatii_membri', 'destinatie_id'),
-    toateOpt('tsk_destinatii_categorii', 'ordine'),
+  const [categorii, sabloane] = await Promise.all([
+    toateOpt('tsk_categorii', 'ordine'),
     toateOpt('tsk_sabloane_campuri', 'ordine'),
   ])
   const [angajati, grupuri, membri, evenimente, statusuri, taskuri, colaboratori, sectiuni, itemi, acces, necitite] =
@@ -40,8 +38,6 @@ export async function incarcaTaskuri() {
       supabase.from('tsk_necitite').select('task_id, motiv').then((r) => r.data || []),
     ])
   return {
-    destinatii,
-    membriDest,
     categorii,
     sabloane,
     angajati,

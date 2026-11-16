@@ -16,7 +16,7 @@ export default function TaskForm({ ctx, evenimentImplicit, onClose, onSaved }) {
   const toateTipurile = [
     ...(ctx.poateEveniment ? [{ k: 'eveniment', tip: 'eveniment', titlu: 'Eveniment', desc: 'Legat de un eveniment din calendar' }] : []),
     ...(ctx.poateOperational ? [{ k: 'operational', tip: 'operational', titlu: 'Operațional', desc: 'Activitate curentă de birou, fără eveniment' }] : []),
-    ...categoriiMedia.map((c) => ({ k: `cat:${c.id}`, tip: 'solicitare', categorie_id: c.id, titlu: `${c.destinatie.nume.replace(/^Echipa /, '')} · ${c.nume}`, desc: `Cerere către ${c.destinatie.nume}` })),
+    ...categoriiMedia.map((c) => ({ k: `cat:${c.id}`, tip: 'solicitare', categorie_id: c.id, titlu: c.nume, desc: c.cod === 'design_grafic' ? 'Afiș, pliant, banner, program de sală…' : c.cod === 'foto_video' ? 'Fotografiere, filmare, interviuri…' : 'Cerere către Media', grup: 'media' })),
   ]
 
   const evenimenteAlegere = useMemo(
@@ -45,6 +45,8 @@ export default function TaskForm({ ctx, evenimentImplicit, onClose, onSaved }) {
     tag: '',
   }))
   const [error, setError] = useState('')
+  // cu mai multe tipuri posibile, întâi o fereastră mică: „Ce fel de task creezi?"
+  const [pas, setPas] = useState(toateTipurile.length > 1 && !evenimentImplicit ? 'alege' : 'form')
   const [busy, setBusy] = useState(false)
   const set = (k, v) => setF((p) => ({ ...p, [k]: v }))
 
@@ -58,7 +60,26 @@ export default function TaskForm({ ctx, evenimentImplicit, onClose, onSaved }) {
     [ctx]
   )
   const setValoare = (cheie, v) => setF((p) => ({ ...p, valori: { ...p.valori, [cheie]: v } }))
-  const alegeTip = (t) => setF((p) => ({ ...p, tip: t.tip, categorie_id: t.categorie_id || '', valori: {}, titluManual: false, titlu: t.tip === 'solicitare' ? '' : p.titlu, eveniment_id: t.tip === 'eveniment' ? p.eveniment_id : t.tip === 'solicitare' ? p.eveniment_id : '' }))
+  const alegeTip = (t) => {
+    setF((p) => ({
+      ...p,
+      tip: t.tip,
+      categorie_id: t.categorie_id || '',
+      valori: {},
+      titluManual: false,
+      titlu: t.tip === 'solicitare' ? '' : p.titlu,
+      eveniment_id: t.tip === 'eveniment' || t.tip === 'solicitare' ? p.eveniment_id : '',
+      // la Media, responsabilul implicit al categoriei vine precompletat
+      responsabil: t.tip === 'solicitare' ? [ctx.responsabiliCategorie(t.categorie_id).find((r) => r.implicit)?.angajat_id].filter(Boolean) : [],
+    }))
+    setPas('form')
+  }
+  const responsabiliMedia = esteSolicitare ? ctx.responsabiliCategorie(f.categorie_id).map((r) => r.angajat_id) : []
+  // câmpurile suplimentare ale tipului (la Media: ale categoriei; la Eveniment / Operațional: ale tipului)
+  const campuriTip = useMemo(() => {
+    const idCateg = esteSolicitare ? f.categorie_id : ctx.categorieTip(f.tip)?.id
+    return idCateg ? ctx.campuriCategorie(idCateg) : []
+  }, [ctx, esteSolicitare, f.tip, f.categorie_id])
   // La alegerea evenimentului se preiau data, ora și locul în câmpurile care le au (rămân editabile)
   const alegeEvenimentSolicitare = (id) =>
     setF((p) => {
@@ -96,6 +117,7 @@ export default function TaskForm({ ctx, evenimentImplicit, onClose, onSaved }) {
     if (esteSolicitare) {
       const eroareCampuri = valideazaCampuri(campuri, f.valori)
       if (eroareCampuri) return setError(eroareCampuri)
+      if (!f.responsabil[0]) return setError(responsabiliMedia.length ? 'Alege responsabilul.' : 'Nu e setat niciun responsabil pentru această categorie. Adminul îl setează în Setări → Structură task.')
       if (!f.termen) return setError('Alege termenul (data limită).')
       if (!f.descriere.trim()) return setError('Scrie descrierea.')
       setBusy(true)
@@ -105,16 +127,18 @@ export default function TaskForm({ ctx, evenimentImplicit, onClose, onSaved }) {
         descriere: f.descriere.trim(),
         termen: f.termen,
         prioritate: f.prioritate,
-        destinatie_id: categorie.destinatie_id,
         categorie_id: categorie.id,
+        responsabil_id: f.responsabil[0],
         eveniment_id: f.eveniment_id || null,
-        date_solicitare: construiestePerechi(campuri, f.valori, ctx, evSolicitare),
+        date_campuri: construiestePerechi(campuri, f.valori, ctx, evSolicitare),
         creat_de: ctx.me.id,
       })
       setBusy(false)
       if (errS) return setError(mesajEroare(errS))
       return onSaved()
     }
+    const eroareCampuri2 = valideazaCampuri(campuriTip, f.valori)
+    if (eroareCampuri2) return setError(eroareCampuri2)
     if (f.tip === 'eveniment' && !f.eveniment_id) return setError('Alege evenimentul.')
     if (f.tip === 'operational' && !f.grup_id && !ctx.admin) return setError('Alege departamentul.')
     if (f.link_document.trim() && !/^https?:\/\/\S+$/i.test(f.link_document.trim())) {
@@ -129,6 +153,7 @@ export default function TaskForm({ ctx, evenimentImplicit, onClose, onSaved }) {
       prioritate: f.prioritate,
       link_document: f.link_document.trim() || null,
       tag: f.tag.trim() || null,
+      date_campuri: construiestePerechi(campuriTip, f.valori, ctx, null),
       ...(f.tip === 'operational' ? { grup_id: f.grup_id || null } : {}),
     }
     const { data, error: err } = await supabase
@@ -156,31 +181,49 @@ export default function TaskForm({ ctx, evenimentImplicit, onClose, onSaved }) {
     )
   }
 
+  if (pas === 'alege') {
+    const grupe = [
+      ['Pentru echipa noastră', toateTipurile.filter((t) => t.tip !== 'solicitare'), '📅🗂'],
+      ['Cerere către Media', toateTipurile.filter((t) => t.tip === 'solicitare'), '🎨🎥'],
+    ].filter(([, l]) => l.length)
+    const pictograma = (t) => (t.tip === 'eveniment' ? '📅' : t.tip === 'operational' ? '🗂' : t.cod === 'foto_video' ? '🎥' : '🎨')
+    return (
+      <Modal titlu="Task nou" onClose={onClose} lat="max-w-md">
+        <p className="mb-3 text-[15px] font-semibold text-slate-700">Ce fel de task creezi?</p>
+        {grupe.map(([nume, lista]) => (
+          <div key={nume} className="mb-3">
+            <p className="mb-1.5 text-[11px] font-extrabold uppercase tracking-wide text-slate-500">{nume}</p>
+            <div className="space-y-2">
+              {lista.map((t) => (
+                <button key={t.k} type="button" onClick={() => alegeTip(t)} className="flex w-full items-center gap-3 rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-left hover:border-accent hover:bg-[#F6F9FE]">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#E4ECF8] text-lg" aria-hidden="true">{pictograma({ ...t, cod: ctx.categMap[t.categorie_id]?.cod })}</span>
+                  <span>
+                    <span className="block text-[15px] font-bold text-slate-900">{t.titlu}</span>
+                    <span className="block text-[13px] font-medium text-slate-500">{t.desc}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </Modal>
+    )
+  }
+
   return (
     <Modal titlu="Task nou" onClose={onClose} esc={false}>
       <form onSubmit={salveaza} className="space-y-4">
-        {toateTipurile.length > 1 && !evenimentImplicit && (
-          <div>
-            <label className={labelCls}>Tip de task *</label>
-            <div className="flex flex-wrap gap-2.5">
-              {toateTipurile.map((t) => {
-                const ales = f.tip === t.tip && (t.tip !== 'solicitare' || f.categorie_id === t.categorie_id)
-                return (
-                  <button
-                    key={t.k}
-                    type="button"
-                    aria-pressed={ales}
-                    onClick={() => alegeTip(t)}
-                    className={`flex min-h-[64px] flex-1 basis-44 flex-col gap-0.5 rounded-xl border px-3.5 py-2.5 text-left ${ales ? 'border-2 border-accent bg-[#EEF3FB]' : 'border-slate-300 bg-white'}`}
-                  >
-                    <span className="text-[15px] font-bold text-slate-900">{t.titlu}</span>
-                    <span className="text-[13px] font-medium text-slate-500">{t.desc}</span>
-                  </button>
-                )
-              })}
+        {toateTipurile.length > 1 && !evenimentImplicit && (() => {
+          const curent = toateTipurile.find((t) => t.tip === f.tip && (t.tip !== 'solicitare' || t.categorie_id === f.categorie_id))
+          return (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-2 rounded-full bg-[#E4ECF8] px-3.5 py-1.5 text-sm font-extrabold text-[#22406B]">
+                {curent?.grup === 'media' ? `Media · ${curent.titlu}` : curent?.titlu}
+              </span>
+              <button type="button" onClick={() => setPas('alege')} className="text-sm font-semibold text-slate-500 underline hover:text-slate-800">Schimbă</button>
             </div>
-          </div>
-        )}
+          )
+        })()}
 
         {esteSolicitare ? (
           <>
@@ -194,6 +237,18 @@ export default function TaskForm({ ctx, evenimentImplicit, onClose, onSaved }) {
               <label className={labelCls}>Titlu *</label>
               <input className={inputCls} maxLength={200} value={f.titlu} onChange={(e) => setF((p) => ({ ...p, titlu: e.target.value, titluManual: true }))} />
               <p className="mt-1 text-xs text-slate-400">Generat automat din ce ai ales; îl poți modifica.</p>
+            </div>
+            <div>
+              <label className={labelCls}>Responsabil *</label>
+              {responsabiliMedia.length === 0 ? (
+                <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">Nu e setat niciun responsabil pentru această categorie. Adminul îl setează în Setări → Structură task.</p>
+              ) : (
+                <select className={inputCls} value={f.responsabil[0] || ''} onChange={(e) => set('responsabil', e.target.value ? [e.target.value] : [])}>
+                  <option value="">— alege responsabilul —</option>
+                  {responsabiliMedia.map((id) => <option key={id} value={id}>{ctx.nume(id)}</option>)}
+                </select>
+              )}
+              <p className="mt-1 text-xs text-slate-400">Contul din Hub care lucrează taskul: schimbă statusul și adaugă linkul de livrare.</p>
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
@@ -277,6 +332,8 @@ export default function TaskForm({ ctx, evenimentImplicit, onClose, onSaved }) {
           <label className={labelCls}>Link către document (opțional)</label>
           <input className={inputCls} placeholder="https://…" value={f.link_document} onChange={(e) => set('link_document', e.target.value)} />
         </div>
+
+        <CampuriSolicitare campuri={campuriTip} valori={f.valori} setValoare={setValoare} ctx={ctx} eveniment={null} />
 
         <div>
           <label className={labelCls}>Colaboratori (opțional)</label>

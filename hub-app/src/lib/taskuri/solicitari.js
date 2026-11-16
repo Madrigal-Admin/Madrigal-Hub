@@ -34,7 +34,7 @@ export function valoareAfisata(camp, v, { ev, nume } = {}) {
 export function construiestePerechi(campuri, valori, ctx, ev) {
   return campuri
     .filter((c) => c.activ)
-    .map((c) => ({ cheie: c.cheie, eticheta: c.eticheta, tip: c.tip, valoare: valoareAfisata(c, valori[c.cheie], { ev, nume: ctx.nume }) }))
+    .map((c) => ({ cheie: c.cheie, eticheta: c.eticheta, tip: c.tip, valoare: valoareAfisata(c, valori[c.cheie], { ev, nume: ctx.nume }), brut: valori[c.cheie] }))
     .filter((p) => p.valoare !== '')
 }
 
