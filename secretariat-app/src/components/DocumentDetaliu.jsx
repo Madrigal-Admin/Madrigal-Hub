@@ -4,7 +4,7 @@ import { supabase } from '../supabaseClient'
 import { ETICHETE_CAMPURI, MOD_SEMNARE, ORDINE_SEMNARE, REGISTRE, STATUSURI, esteStaff, veziTot } from '../lib/roluri'
 import { formatData, formatDataOra, mesajEroare } from '../lib/util'
 import { btnGhost, btnPrimary, inputCls, labelCls } from '../lib/ui'
-import { CasetaMotiv, Eroare, Info, Linie, ModSemnareBadge, PanouLateral, PasiStare, Rand, Sectiune } from './comun'
+import { CasetaMotiv, Eroare, Info, Linie, ModSemnareBadge, PanouLateral, PasiStare, Rand, Sectiune, StareBadge } from './comun'
 import { AngajatiMulti } from './Pickere'
 import Fisiere from './Fisiere'
 import { CircuitLocatie, CircuitSemnatari, useCircuit } from './CircuitSectiune'
@@ -12,7 +12,7 @@ import StergereDocument from './StergereDocument'
 
 const PASI_FLUX = {
   intrari: ['inregistrat', 'repartizat', 'in_lucru', 'solutionat'],
-  iesiri: ['inregistrat', 'transmis', 'confirmat'],
+  iesiri: ['inregistrat', 'transmis'],
 }
 const NUME_REGISTRU = { intrari: 'Intrare', iesiri: 'Ieșire', circuit: 'Circuit de semnare' }
 const linkCls = 'text-sm font-semibold text-accent hover:underline focus-ring'
@@ -77,7 +77,7 @@ export default function DocumentDetaliu({ id, role, comune, onInapoi, onEdit, on
     if (!d) return
     const cereri = [
       supabase.from('sec_fisiere').select('*').eq('document_id', id).order('versiune', { ascending: false }),
-      supabase.from('sec_documente_lista').select('id, registru, numar_afisat, obiect').eq('legat_de', id),
+      supabase.from('sec_documente_lista').select('id, registru, numar_afisat, obiect, status').eq('legat_de', id),
       supabase.from('sec_documente_lista').select('id, registru, numar_afisat, obiect, status').eq('circuit_id', id).order('created_at'),
     ]
     if (veziTot(role)) {
@@ -114,6 +114,16 @@ export default function DocumentDetaliu({ id, role, comune, onInapoi, onEdit, on
       <div className="space-y-4">
         <button className={btnGhost} onClick={onInapoi}><ArrowLeft size={14} /> Înapoi la registru</button>
         <Eroare>Documentul nu există sau nu ai acces la el.</Eroare>
+      </div>
+    )
+  }
+  if (doc.status === 'liber') {
+    return (
+      <div className="space-y-4">
+        <button className={btnGhost} onClick={onInapoi}><ArrowLeft size={14} /> Înapoi la registru</button>
+        <h2 className="text-[28px] font-extrabold tracking-tight text-slate-900">{doc.numar_afisat}</h2>
+        <Info>Acesta este un loc liber, rezervat la {formatData(doc.data_inreg)}. Nu conține încă niciun document.</Info>
+        {esteStaff(role) && <button className={btnPrimary} onClick={() => onEdit(doc)}><Pencil size={14} /> Completează</button>}
       </div>
     )
   }
@@ -192,10 +202,14 @@ function Pagina({ doc, fisiere, jurnal, legat, legaturi, iesiriCircuit, circuitS
   iesiriCircuit.forEach((l) => chips.push({ ...l, rol: 'Înregistrat în Ieșiri' }))
   legaturi.filter((l) => !iesiriCircuit.some((x) => x.id === l.id)).forEach((l) => chips.push({ ...l, rol: NUME_REGISTRU[l.registru] || 'Document legat' }))
 
+  // Circuitul activ (neanulat) al acestei Intrări: un singur circuit pe document
+  const circuitActiv = intrare ? legaturi.find((l) => l.registru === 'circuit' && l.status !== 'anulat') : null
+
   // ---- Acțiuni către alte registre ----
   const trimiteLaSemnare = () =>
     onNou('circuit', {
       legat: { id: doc.id, numar_afisat: doc.numar_afisat, obiect: doc.obiect },
+      serie_id: doc.serie_id,
       obiect: doc.obiect,
       tip_id: doc.tip_id || '',
       resp_angajat_id: doc.resp_angajat_id || '',
@@ -213,6 +227,7 @@ function Pagina({ doc, fisiere, jurnal, legat, legaturi, iesiriCircuit, circuitS
       circuit: { id: doc.id, numar_afisat: doc.numar_afisat },
       legat: legat?.id ? { id: legat.id, numar_afisat: legat.numar_afisat, obiect: legat.obiect } : null,
       contact,
+      serie_id: doc.serie_id,
       obiect: doc.obiect,
       tip_id: doc.tip_id || '',
       mod_semnare: doc.mod_semnare,
@@ -239,8 +254,11 @@ function Pagina({ doc, fisiere, jurnal, legat, legaturi, iesiriCircuit, circuitS
               </span>
             )}
             <div className="ml-auto flex flex-wrap gap-2">
-              {staff && intrare && doc.status !== 'anulat' && (
+              {staff && intrare && doc.status !== 'anulat' && !circuitActiv && (
                 <button className={btnPrimary} onClick={trimiteLaSemnare}><Send size={14} /> Trimite la semnare</button>
+              )}
+              {intrare && circuitActiv && (
+                <button className={btnGhost} onClick={() => onDeschide('circuit', circuitActiv.id)}><Send size={14} /> Circuit deschis: {circuitActiv.numar_afisat}</button>
               )}
               {staff && circuit && ['in_circuit', 'semnat'].includes(doc.status) && (
                 <button className={btnPrimary} disabled={doc.status !== 'semnat'} onClick={creazaIesire}><FileOutput size={14} /> Înregistrează în Ieșiri</button>
@@ -274,6 +292,13 @@ function Pagina({ doc, fisiere, jurnal, legat, legaturi, iesiriCircuit, circuitS
                 {legat.obiect && <span className="text-slate-500"> · {legat.obiect}</span>}
               </Rand>
             )}
+            {intrare && circuitActiv && (
+              <Rand eticheta="Circuit de semnare">
+                <button className="font-bold text-accent hover:underline focus-ring" onClick={() => onDeschide('circuit', circuitActiv.id)}>{circuitActiv.numar_afisat}</button>
+                <span className="ml-2 align-middle"><StareBadge stare={circuitActiv.status} /></span>
+                <span className="ml-2 text-xs text-slate-500">Un singur circuit pe document.</span>
+              </Rand>
+            )}
             {!circuit && <Rand eticheta={info.contact}>{doc.contact_denumire}</Rand>}
             {intrare && <Rand eticheta="Document primit">{[doc.nr_document_extern, doc.data_document && `din ${formatData(doc.data_document)}`].filter(Boolean).join(' ')}</Rand>}
             {!circuit && <Rand eticheta={info.canal}>{doc.canal_denumire}</Rand>}
@@ -282,6 +307,7 @@ function Pagina({ doc, fisiere, jurnal, legat, legaturi, iesiriCircuit, circuitS
             {iesire && <Rand eticheta="Semnatar">{numeAng(doc.semnatar_id)}</Rand>}
             <Rand eticheta="Mod de semnare">{MOD_SEMNARE[doc.mod_semnare]}</Rand>
             {circuit && <Rand eticheta="Ordine">{ORDINE_SEMNARE[doc.ordine_semnare]}</Rand>}
+            <Rand eticheta="Serie">{doc.serie_cod} — {doc.serie_denumire}</Rand>
             <Rand eticheta="Înregistrat">{[formatData(doc.data_inreg), numeAng(doc.creat_de) && `de ${numeAng(doc.creat_de)}`].filter(Boolean).join(', ')}</Rand>
           </dl>
         </div>

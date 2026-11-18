@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { REGISTRE } from '../lib/roluri'
 import { formatData, mesajEroare } from '../lib/util'
-import { btnGhost, btnPrimary, inputCls, labelCls } from '../lib/ui'
+import { btnDanger, btnGhost, btnPrimary, inputCls, labelCls } from '../lib/ui'
 import { Card, Eroare, Info, Titlu } from './comun'
 
 // Listă editabilă simplă (canale, tipuri de document). Nu se șterge nimic: se dezactivează.
@@ -73,9 +73,112 @@ function ListEditor({ tabel, titlu, descriere, reload }) {
   )
 }
 
-// Numărul de start al fiecărui registru, pe anul curent (doar Admin Hub, doar cât timp nu există documente)
-function Numerotare({ admin }) {
+// Seriile (RU, CTB, …): numerotare proprie pe serie. Doar Admin Hub le poate adăuga, redenumi, dezactiva sau șterge (cât timp nu au documente).
+function SeriiEditor({ admin, serii, reload }) {
   const an = new Date().getFullYear()
+  const [contoare, setContoare] = useState([])
+  const [nou, setNou] = useState({ cod: '', denumire: '' })
+  const [edit, setEdit] = useState(null) // { id, cod, denumire }
+  const [sterge, setSterge] = useState(null)
+  const [eroare, setEroare] = useState('')
+  const [mesaj, setMesaj] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    supabase.from('sec_contoare').select('serie_id, registru, ultim_nr').eq('an', an).then(({ data }) => setContoare(data || []))
+  }, [serii, an])
+
+  const numere = (id) => {
+    const c = contoare.filter((x) => x.serie_id === id)
+    const val = (reg) => c.find((x) => x.registru === reg)?.ultim_nr || 0
+    return `Numere acordate în ${an}: Intrări ${val('intrari')} · Ieșiri ${val('iesiri')} · Circuit ${val('circuit')}`
+  }
+
+  async function ruleaza(actiune, ok) {
+    setEroare('')
+    setMesaj('')
+    setBusy(true)
+    const { error } = await actiune()
+    setBusy(false)
+    if (error) { setEroare(mesajEroare(error)); return false }
+    setMesaj(ok)
+    await reload()
+    return true
+  }
+
+  return (
+    <Card className="space-y-3">
+      <div>
+        <h3 className="text-sm font-semibold text-slate-800">Serii</h3>
+        <p className="text-xs text-slate-500">
+          Fiecare serie are numerotare proprie pe an (INT RU 1/2026, INT CTB 1/2026…) în fiecare registru. O serie cu documente nu se șterge, doar se dezactivează:
+          nu mai apare la „Adaugă”, dar documentele ei rămân. Codul nu se mai schimbă după primul document.
+        </p>
+      </div>
+      <Eroare>{eroare}</Eroare>
+      {mesaj && <Info>{mesaj}</Info>}
+      <ul className="divide-y divide-slate-100 text-sm">
+        {serii.map((x) => (
+          <li key={x.id} className="flex flex-wrap items-center gap-3 py-2">
+            {edit?.id === x.id ? (
+              <>
+                <input aria-label="Cod serie" className={`${inputCls} !w-24`} value={edit.cod} maxLength={8} onChange={(e) => setEdit({ ...edit, cod: e.target.value.toUpperCase() })} />
+                <input aria-label="Denumire serie" className={`${inputCls} !w-64`} value={edit.denumire} onChange={(e) => setEdit({ ...edit, denumire: e.target.value })} />
+                <button className={btnPrimary} disabled={busy} onClick={async () => { if (await ruleaza(() => supabase.rpc('sec_serie_salveaza', { p_id: x.id, p_cod: edit.cod, p_denumire: edit.denumire }), 'Seria a fost salvată.')) setEdit(null) }}>Salvează</button>
+                <button className={btnGhost} onClick={() => setEdit(null)}>Renunță</button>
+              </>
+            ) : (
+              <>
+                <strong className="w-16 text-slate-800">{x.cod}</strong>
+                <span className="min-w-[10rem] flex-1 text-slate-700">{x.denumire}</span>
+                <span className="text-xs text-slate-500">{numere(x.id)}</span>
+                <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${x.activ ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{x.activ ? 'Activă' : 'Dezactivată'}</span>
+                {admin && (
+                  <span className="flex flex-wrap gap-2">
+                    <button className={btnGhost} onClick={() => setEdit({ id: x.id, cod: x.cod, denumire: x.denumire })}>Redenumește</button>
+                    <button className={btnGhost} disabled={busy} onClick={() => ruleaza(() => supabase.rpc('sec_serie_activeaza', { p_id: x.id, p_activ: !x.activ }), x.activ ? 'Seria a fost dezactivată.' : 'Seria a fost reactivată.')}>
+                      {x.activ ? 'Dezactivează' : 'Reactivează'}
+                    </button>
+                    {sterge === x.id ? (
+                      <button className={btnDanger} disabled={busy} onClick={async () => { await ruleaza(() => supabase.rpc('sec_serie_sterge', { p_id: x.id }), 'Seria a fost ștearsă.'); setSterge(null) }}>Confirmă ștergerea</button>
+                    ) : (
+                      <button className={btnDanger} onClick={() => setSterge(x.id)}>Șterge</button>
+                    )}
+                  </span>
+                )}
+              </>
+            )}
+          </li>
+        ))}
+      </ul>
+      {admin ? (
+        <form
+          onSubmit={async (e) => { e.preventDefault(); if (await ruleaza(() => supabase.rpc('sec_serie_salveaza', { p_id: null, p_cod: nou.cod, p_denumire: nou.denumire }), 'Seria a fost adăugată.')) setNou({ cod: '', denumire: '' }) }}
+          className="flex flex-wrap items-end gap-2"
+        >
+          <div className="w-28">
+            <label className={labelCls} htmlFor="serie_cod_nou">Cod (ex. JUR)</label>
+            <input id="serie_cod_nou" className={inputCls} value={nou.cod} maxLength={8} onChange={(e) => setNou({ ...nou, cod: e.target.value.toUpperCase() })} />
+          </div>
+          <div className="min-w-[14rem] flex-1 sm:max-w-xs">
+            <label className={labelCls} htmlFor="serie_den_nou">Denumire</label>
+            <input id="serie_den_nou" className={inputCls} value={nou.denumire} onChange={(e) => setNou({ ...nou, denumire: e.target.value })} />
+          </div>
+          <button type="submit" className={btnPrimary} disabled={busy || !nou.cod.trim() || !nou.denumire.trim()}>Adaugă serie</button>
+        </form>
+      ) : (
+        <p className="text-xs text-slate-500">Seriile le administrează adminul Hub.</p>
+      )}
+    </Card>
+  )
+}
+
+// Numărul de start al fiecărui registru, pe anul curent (doar Admin Hub, doar cât timp nu există documente)
+function Numerotare({ admin, serii }) {
+  const an = new Date().getFullYear()
+  const [serieId, setSerieId] = useState('')
+  const serie = serii.find((x) => x.id === serieId)
+  useEffect(() => { if (!serieId && serii.length) setSerieId((serii.find((x) => x.cod === 'SEC') || serii[0]).id) }, [serii, serieId])
   const [stare, setStare] = useState({})
   const [valori, setValori] = useState({ intrari: { nr: '', data: '' }, iesiri: { nr: '', data: '' }, circuit: { nr: '', data: '' } })
   const [eroare, setEroare] = useState('')
@@ -83,17 +186,18 @@ function Numerotare({ admin }) {
   const [busy, setBusy] = useState(false)
 
   async function incarca() {
+    if (!serieId) return
     const out = {}
     for (const reg of ['intrari', 'iesiri', 'circuit']) {
       const [{ data: c }, { count }] = await Promise.all([
-        supabase.from('sec_contoare').select('*').eq('registru', reg).eq('an', an).maybeSingle(),
-        supabase.from('sec_documente').select('id', { count: 'exact', head: true }).eq('registru', reg).eq('an', an),
+        supabase.from('sec_contoare').select('*').eq('registru', reg).eq('serie_id', serieId).eq('an', an).maybeSingle(),
+        supabase.from('sec_documente').select('id', { count: 'exact', head: true }).eq('registru', reg).eq('serie_id', serieId).eq('an', an),
       ])
       out[reg] = { contor: c, documente: count || 0 }
     }
     setStare(out)
   }
-  useEffect(() => { incarca() }, [])
+  useEffect(() => { setStare({}); incarca() }, [serieId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function seteaza(reg) {
     setEroare('')
@@ -102,10 +206,10 @@ function Numerotare({ admin }) {
     if (!v.nr || Number(v.nr) < 1) return setEroare('Scrie numărul cu care începe registrul (cel puțin 1).')
     if (!v.data) return setEroare('Alege data de la care Hub-ul ține registrul.')
     setBusy(true)
-    const { error } = await supabase.rpc('sec_seteaza_start', { p_registru: reg, p_an: an, p_urmatorul: Number(v.nr), p_data: v.data })
+    const { error } = await supabase.rpc('sec_seteaza_start', { p_registru: reg, p_serie: serieId, p_an: an, p_urmatorul: Number(v.nr), p_data: v.data })
     setBusy(false)
     if (error) return setEroare(mesajEroare(error))
-    setMesaj(`Registrul de ${REGISTRE[reg].label.toLowerCase()} va începe de la numărul ${v.nr}.`)
+    setMesaj(`Seria ${serie?.cod}: registrul de ${REGISTRE[reg].label.toLowerCase()} va începe de la numărul ${v.nr}.`)
     incarca()
   }
 
@@ -114,9 +218,15 @@ function Numerotare({ admin }) {
       <div>
         <h3 className="text-sm font-semibold text-slate-800">Numerotarea pe {an}</h3>
         <p className="text-xs text-slate-500">
-          Numerotarea reîncepe la 1 în fiecare an. Dacă registrul de hârtie a ajuns deja la un număr, setează aici numărul de la care continuă Hub-ul
-          și data de start. Se poate face doar cât timp nu există nicio înregistrare în registrul respectiv pe {an}.
+          Fiecare serie are numerotare proprie, care reîncepe la 1 în fiecare an. Dacă registrul de hârtie a ajuns deja la un număr, setează aici numărul de la care continuă Hub-ul
+          și data de start. Se poate face doar cât timp nu există nicio înregistrare în registrul și seria respectivă pe {an}.
         </p>
+        <div className="mt-3 max-w-xs">
+          <label className={labelCls} htmlFor="serie_start">Serie</label>
+          <select id="serie_start" className={inputCls} value={serieId} onChange={(e) => setSerieId(e.target.value)}>
+            {serii.map((x) => <option key={x.id} value={x.id}>{x.cod} — {x.denumire}</option>)}
+          </select>
+        </div>
       </div>
       <Eroare>{eroare}</Eroare>
       {mesaj && <Info>{mesaj}</Info>}
@@ -127,7 +237,7 @@ function Numerotare({ admin }) {
           const blocat = s.documente > 0
           return (
             <div key={reg} className="space-y-2 rounded-lg border border-slate-200 p-3">
-              <p className="text-sm font-semibold text-slate-700">{REGISTRE[reg].label} ({REGISTRE[reg].prefix})</p>
+              <p className="text-sm font-semibold text-slate-700">{REGISTRE[reg].label} ({REGISTRE[reg].prefix} {serie?.cod})</p>
               <p className="text-sm text-slate-600">
                 {s.contor
                   ? `Ultimul număr acordat: ${s.contor.ultim_nr}${s.contor.inceput_la ? ` · start: ${formatData(s.contor.inceput_la)}` : ''}`
@@ -151,7 +261,7 @@ function Numerotare({ admin }) {
                   <button className={btnPrimary} disabled={busy} onClick={() => seteaza(reg)}>Setează</button>
                 </div>
               )}
-              {admin && blocat && <p className="text-xs text-amber-700">Numărul de start nu mai poate fi schimbat: există deja documente. Dacă sunt doar documente de test, șterge-le din pagina fiecărui document (secțiunea „Ștergere definitivă”); după ce registrul rămâne gol, câmpul se deblochează.</p>}
+              {admin && blocat && <p className="text-xs text-amber-700">Numărul de start nu mai poate fi schimbat: există deja documente. Dacă sunt doar documente de test, șterge-le din pagina fiecărui document (secțiunea „Ștergere definitivă”); după ce registrul și seria rămân goale, câmpul se deblochează.</p>}
               {!admin && !blocat && <p className="text-xs text-slate-500">Numărul de start îl setează adminul Hub.</p>}
             </div>
           )
@@ -183,11 +293,12 @@ function JurnalStergeri() {
   )
 }
 
-export default function Setari({ role, reload }) {
+export default function Setari({ role, comune, reload }) {
   return (
     <div className="space-y-4">
       <Titlu>Setări Secretariat</Titlu>
-      <Numerotare admin={role === 'admin'} />
+      <SeriiEditor admin={role === 'admin'} serii={comune.serii} reload={reload} />
+      <Numerotare admin={role === 'admin'} serii={comune.serii} />
       {role === 'admin' && <JurnalStergeri />}
       <div className="grid gap-4 lg:grid-cols-2">
         <ListEditor tabel="sec_canale" titlu="Canale de primire / moduri de transmitere" descriere="Ex. Poștă, Curier, E-mail. Se folosesc la Intrări și la Ieșiri." reload={reload} />

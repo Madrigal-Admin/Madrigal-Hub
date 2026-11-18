@@ -17,7 +17,7 @@ export const REGISTRE = {
     contact: 'Expeditor',
     canal: 'Canal de primire',
     resp: 'Repartizat către',
-    nou: 'Înregistrare document intrat',
+    nou: 'Adaugă intrare',
   },
   iesiri: {
     label: 'Ieșiri',
@@ -25,7 +25,7 @@ export const REGISTRE = {
     contact: 'Destinatar',
     canal: 'Mod de transmitere',
     resp: 'Departament / persoană inițiatoare',
-    nou: 'Înregistrare document ieșit',
+    nou: 'Adaugă ieșire',
   },
   circuit: {
     label: 'Circuit de semnare',
@@ -33,7 +33,7 @@ export const REGISTRE = {
     contact: 'Contact',
     canal: 'Canal',
     resp: 'Inițiator (persoană / departament)',
-    nou: 'Document nou pentru semnare',
+    nou: 'Adaugă circuit semnare',
   },
 }
 
@@ -49,7 +49,8 @@ export const STATUSURI = {
   in_lucru: { label: 'În lucru', clasa: galben },
   solutionat: { label: 'Soluționat', clasa: verde },
   transmis: { label: 'Transmis', clasa: albastru },
-  confirmat: { label: 'Confirmat de destinatar', clasa: verde },
+  confirmat: { label: 'Confirmat de destinatar (vechi)', clasa: verde }, // nu se mai folosește; rămâne doar pentru jurnalul vechi
+  liber: { label: 'Loc liber', clasa: 'bg-orange-50 text-orange-700' },
   arhivat: { label: 'Arhivat', clasa: 'bg-violet-50 text-violet-700' },
   // Circuit de semnare (în baza de date: ciorna / in_circuit / semnat / refuzat)
   ciorna: { label: 'Ciornă', clasa: gri },
@@ -62,7 +63,7 @@ export const STATUSURI = {
 // Ordinea statusurilor în fiecare registru (anularea se face separat, cu motiv)
 export const FLUX = {
   intrari: ['inregistrat', 'repartizat', 'in_lucru', 'solutionat', 'arhivat'],
-  iesiri: ['inregistrat', 'transmis', 'confirmat', 'arhivat'],
+  iesiri: ['inregistrat', 'transmis', 'arhivat'],
 }
 
 export const STARE_SEMNATAR = {
@@ -85,6 +86,9 @@ export const MOD_SEMNARE = {
 }
 
 export const ETICHETE_CAMPURI = {
+  serie_id: 'Serie',
+  data_inreg: 'Data înregistrării',
+  circuit_id: 'Circuit de semnare',
   data_document: 'Data documentului',
   nr_document_extern: 'Nr. document primit',
   contact_id: 'Expeditor / destinatar',

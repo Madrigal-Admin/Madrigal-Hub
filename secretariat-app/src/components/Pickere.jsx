@@ -163,7 +163,7 @@ export function RespPicker({ eticheta, angajatId, grupId, onChange, comune, obli
 }
 
 // Alegerea unui alt document din registre (legătură Intrare ↔ Ieșire), după număr sau obiect
-export function DocPicker({ eticheta, valoare, onChange, excludeId, registru }) {
+export function DocPicker({ eticheta, valoare, onChange, excludeId, registru, faraCircuit = false, permiteId = null }) {
   const [text, setText] = useState('')
   const [optiuni, setOptiuni] = useState([])
   const [deschis, setDeschis] = useState(false)
@@ -176,13 +176,20 @@ export function DocPicker({ eticheta, valoare, onChange, excludeId, registru }) 
       let q = supabase.from('sec_documente_lista').select('id, numar_afisat, obiect, contact_denumire, status')
         .neq('status', 'anulat').order('created_at', { ascending: false }).limit(8)
       if (excludeId) q = q.neq('id', excludeId)
+      q = q.neq('status', 'liber')
       if (registru) q = q.eq('registru', registru)
+      if (faraCircuit) {
+        // Intrările care au deja un circuit de semnare activ nu mai pot fi alese (un singur circuit pe document)
+        const { data: active } = await supabase.from('sec_documente_lista').select('legat_de').eq('registru', 'circuit').neq('status', 'anulat').not('legat_de', 'is', null)
+        const ocupate = (active || []).map((x) => x.legat_de).filter((x) => x && x !== permiteId && /^[0-9a-f-]{36}$/i.test(x))
+        if (ocupate.length) q = q.not('id', 'in', `(${ocupate.join(',')})`)
+      }
       if (t) q = q.or(`numar_afisat.ilike.%${t}%,obiect.ilike.%${t}%,contact_denumire.ilike.%${t}%`)
       const { data } = await q
       setOptiuni(data || [])
     }, 250)
     return () => clearTimeout(handle)
-  }, [text, deschis, excludeId, registru])
+  }, [text, deschis, excludeId, registru, faraCircuit, permiteId])
 
   useEffect(() => {
     const afara = (e) => { if (radacina.current && !radacina.current.contains(e.target)) setDeschis(false) }

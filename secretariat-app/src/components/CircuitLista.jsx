@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ExternalLink, Lock, Plus, Search } from 'lucide-react'
+import { ExternalLink, Lock, Pencil, Plus, Search } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { MOD_SEMNARE_SCURT, REGISTRE, STATUSURI, esteStaff } from '../lib/roluri'
 import { deschideFisier } from '../lib/fisiere'
@@ -7,12 +7,13 @@ import { formatData, mesajEroare } from '../lib/util'
 import { btnGhost, btnPrimary, inputCls, labelCls } from '../lib/ui'
 import { Card, Eroare, ModSemnareBadge, StareBadge, Titlu } from './comun'
 import { numeResponsabil } from './RegistruLista'
+import { LocLiber, SerieChips } from './Serii'
 
 const PE_PAGINA = 25
-const STATUSURI_CIRCUIT = ['ciorna', 'in_circuit', 'semnat', 'refuzat', 'anulat']
-const FILTRE_IMPLICITE = () => ({ an: new Date().getFullYear(), q: '', status: '', mod: '', de: '', pana: '', pagina: 1 })
+const STATUSURI_CIRCUIT = ['ciorna', 'in_circuit', 'semnat', 'refuzat', 'liber', 'anulat']
+const FILTRE_IMPLICITE = () => ({ an: new Date().getFullYear(), q: '', serie: '', status: '', mod: '', de: '', pana: '', pagina: 1 })
 
-export default function CircuitLista({ role, comune, filtre, setFiltre, onDeschide, onNou }) {
+export default function CircuitLista({ role, comune, filtre, setFiltre, versiune, onDeschide, onNou, onEdit, onLiber }) {
   const info = REGISTRE.circuit
   const [f, setF] = useState(() => filtre || FILTRE_IMPLICITE())
   const [rows, setRows] = useState([])
@@ -26,12 +27,13 @@ export default function CircuitLista({ role, comune, filtre, setFiltre, onDeschi
     const handle = setTimeout(incarca, f.q ? 300 : 0)
     return () => clearTimeout(handle)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [f])
+  }, [f, versiune])
 
   async function incarca() {
     setLoading(true)
     setEroare('')
     let query = supabase.from('sec_documente_lista').select('*', { count: 'exact' }).eq('registru', 'circuit').eq('an', f.an)
+    if (f.serie) query = query.eq('serie_id', f.serie)
     if (f.status) query = query.eq('status', f.status)
     if (f.mod) query = query.eq('mod_semnare', f.mod)
     if (f.de) query = query.gte('data_inreg', f.de)
@@ -48,7 +50,7 @@ export default function CircuitLista({ role, comune, filtre, setFiltre, onDeschi
 
   const set = (cheie, valoare) => setF((v) => ({ ...v, [cheie]: valoare, pagina: cheie === 'pagina' ? valoare : 1 }))
   const nrPagini = Math.max(1, Math.ceil(total / PE_PAGINA))
-  const filtrat = f.q || f.status || f.mod || f.de || f.pana
+  const filtrat = f.q || f.serie || f.status || f.mod || f.de || f.pana
 
   async function deschideLink(e, path) {
     e.stopPropagation()
@@ -69,9 +71,18 @@ export default function CircuitLista({ role, comune, filtre, setFiltre, onDeschi
 
   return (
     <div className="space-y-4">
-      <Titlu actiuni={esteStaff(role) && <button className={btnPrimary} onClick={onNou}><Plus size={15} /> {info.nou}</button>}>
+      <Titlu
+        actiuni={esteStaff(role) && (
+          <>
+            <LocLiber registru="circuit" role={role} serii={comune.serii} serieImplicita={f.serie} onGata={onLiber} />
+            <button className={btnPrimary} onClick={() => onNou(f.serie)}><Plus size={15} /> {info.nou}</button>
+          </>
+        )}
+      >
         {info.label}
       </Titlu>
+
+      <SerieChips serii={comune.serii} valoare={f.serie} onChange={(v) => set('serie', v)} />
 
       <Card>
         <div className="grid gap-3 md:grid-cols-4">
@@ -121,7 +132,7 @@ export default function CircuitLista({ role, comune, filtre, setFiltre, onDeschi
       <Eroare>{eroare}</Eroare>
 
       <Card className="overflow-x-auto p-0">
-        <table className="w-full min-w-[900px] text-left text-sm">
+        <table className="w-full min-w-[980px] text-left text-sm">
           <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
             <tr>
               <th className="px-4 py-2.5 font-semibold">Număr</th>
@@ -132,33 +143,55 @@ export default function CircuitLista({ role, comune, filtre, setFiltre, onDeschi
               <th className="px-4 py-2.5 font-semibold">Semnatari</th>
               <th className="px-4 py-2.5 font-semibold">Locație / fișier</th>
               <th className="px-4 py-2.5 font-semibold">Status</th>
+              <th className="px-4 py-2.5"><span className="sr-only">Acțiuni</span></th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((d) => (
-              <tr key={d.id} tabIndex={0} onClick={() => onDeschide(d.id)} onKeyDown={(e) => e.key === 'Enter' && onDeschide(d.id)}
-                className="cursor-pointer border-b border-slate-100 last:border-0 hover:bg-slate-50 focus-ring">
-                <td className="whitespace-nowrap px-4 py-2.5 font-semibold text-accent">
-                  {d.numar_afisat}
-                  {d.confidential && <Lock size={12} className="ml-1.5 inline text-slate-400" aria-label="Confidențial" />}
-                </td>
-                <td className="whitespace-nowrap px-4 py-2.5 text-slate-600">{formatData(d.data_inreg)}</td>
-                <td className="max-w-xs truncate px-4 py-2.5" title={d.obiect}>{d.obiect}</td>
-                <td className="px-4 py-2.5 text-slate-600">{numeResponsabil(comune, d)}</td>
-                <td className="px-4 py-2.5"><ModSemnareBadge mod={d.mod_semnare} /></td>
-                <td className="whitespace-nowrap px-4 py-2.5 text-slate-600">
-                  {d.semnatari_total > 0 ? `${d.semnatari_semnat} din ${d.semnatari_total}` : <span className="text-slate-400">—</span>}
-                </td>
-                <td className="px-4 py-2.5 text-slate-600">{locatieSauFisier(d)}</td>
-                <td className="px-4 py-2.5"><StareBadge stare={d.status} /></td>
-              </tr>
-            ))}
+            {rows.map((d) => {
+              const liber = d.status === 'liber'
+              const staff = esteStaff(role)
+              const poateEdita = staff && d.status === 'ciorna'
+              return (
+                <tr key={d.id} tabIndex={0} onClick={() => (liber ? staff && onEdit(d) : onDeschide(d.id))} onKeyDown={(e) => e.key === 'Enter' && (liber ? staff && onEdit(d) : onDeschide(d.id))}
+                  className={`cursor-pointer border-b border-slate-100 last:border-0 hover:bg-slate-50 focus-ring ${liber ? 'bg-orange-50/40' : ''}`}>
+                  <td className="whitespace-nowrap px-4 py-2.5 font-semibold text-accent">
+                    {d.numar_afisat}
+                    {d.confidential && <Lock size={12} className="ml-1.5 inline text-slate-400" aria-label="Confidențial" />}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-2.5 text-slate-600">{formatData(d.data_inreg)}</td>
+                  {liber ? (
+                    <>
+                      <td className="px-4 py-2.5 italic text-slate-400">Loc liber — rezervat, necompletat</td>
+                      <td className="px-4 py-2.5 text-slate-300">—</td>
+                      <td className="px-4 py-2.5 text-slate-300">—</td>
+                      <td className="px-4 py-2.5 text-slate-300">—</td>
+                      <td className="px-4 py-2.5 text-slate-300">—</td>
+                    </>
+                  ) : (
+                    <>
+                      <td className="max-w-xs truncate px-4 py-2.5" title={d.obiect}>{d.obiect}</td>
+                      <td className="px-4 py-2.5 text-slate-600">{numeResponsabil(comune, d)}</td>
+                      <td className="px-4 py-2.5"><ModSemnareBadge mod={d.mod_semnare} /></td>
+                      <td className="whitespace-nowrap px-4 py-2.5 text-slate-600">
+                        {d.semnatari_total > 0 ? `${d.semnatari_semnat} din ${d.semnatari_total}` : <span className="text-slate-400">—</span>}
+                      </td>
+                      <td className="px-4 py-2.5 text-slate-600">{locatieSauFisier(d)}</td>
+                    </>
+                  )}
+                  <td className="px-4 py-2.5"><StareBadge stare={d.status} /></td>
+                  <td className="whitespace-nowrap px-4 py-2.5 text-right">
+                    {liber && staff && <button className={btnPrimary} onClick={(e) => { e.stopPropagation(); onEdit(d) }}>Completează</button>}
+                    {poateEdita && <button className={btnGhost} onClick={(e) => { e.stopPropagation(); onEdit(d) }}><Pencil size={13} /> Editează</button>}
+                  </td>
+                </tr>
+              )
+            })}
             {!loading && rows.length === 0 && (
-              <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500">
+              <tr><td colSpan={9} className="px-4 py-8 text-center text-slate-500">
                 {filtrat ? 'Niciun document nu se potrivește filtrelor.' : `Nu există încă documente în Circuitul de semnare pe ${f.an}.`}
               </td></tr>
             )}
-            {loading && <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-400">Se încarcă…</td></tr>}
+            {loading && <tr><td colSpan={9} className="px-4 py-8 text-center text-slate-400">Se încarcă…</td></tr>}
           </tbody>
         </table>
       </Card>

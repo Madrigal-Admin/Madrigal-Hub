@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react'
-import { Lock, Plus, Search } from 'lucide-react'
+import { Lock, Pencil, Plus, Search } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { FLUX, REGISTRE, STATUSURI, esteStaff } from '../lib/roluri'
 import { azi, formatData, mesajEroare } from '../lib/util'
 import { btnGhost, btnPrimary, inputCls, labelCls } from '../lib/ui'
 import { Card, Eroare, StareBadge, Titlu } from './comun'
+import { LocLiber, SerieChips } from './Serii'
 
 const PE_PAGINA = 25
 
 const FILTRE_IMPLICITE = () => ({
   an: new Date().getFullYear(),
   q: '',
+  serie: '',
   status: '',
   tip: '',
   grup: '',
@@ -25,7 +27,7 @@ export function numeResponsabil(comune, doc) {
   return [ang?.nume_complet, grup?.nume].filter(Boolean).join(' · ')
 }
 
-export default function RegistruLista({ registru, role, comune, filtre, setFiltre, onDeschide, onNou }) {
+export default function RegistruLista({ registru, role, comune, filtre, setFiltre, versiune, onDeschide, onNou, onEdit, onLiber }) {
   const info = REGISTRE[registru]
   const [f, setF] = useState(() => filtre || FILTRE_IMPLICITE())
   const [rows, setRows] = useState([])
@@ -43,7 +45,7 @@ export default function RegistruLista({ registru, role, comune, filtre, setFiltr
     const handle = setTimeout(incarca, f.q ? 300 : 0) // mică amânare cât se scrie în căutare
     return () => clearTimeout(handle)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [f])
+  }, [f, versiune])
 
   async function incarca() {
     setLoading(true)
@@ -53,6 +55,7 @@ export default function RegistruLista({ registru, role, comune, filtre, setFiltr
       .select('*', { count: 'exact' })
       .eq('registru', registru)
       .eq('an', f.an)
+    if (f.serie) query = query.eq('serie_id', f.serie)
     if (f.status) query = query.eq('status', f.status)
     if (f.tip) query = query.eq('tip_id', f.tip)
     if (f.de) query = query.gte('data_inreg', f.de)
@@ -76,7 +79,7 @@ export default function RegistruLista({ registru, role, comune, filtre, setFiltr
 
   const set = (cheie, valoare) => setF((v) => ({ ...v, [cheie]: valoare, pagina: cheie === 'pagina' ? valoare : 1 }))
   const nrPagini = Math.max(1, Math.ceil(total / PE_PAGINA))
-  const filtrat = f.q || f.status || f.tip || f.grup || f.de || f.pana
+  const filtrat = f.q || f.serie || f.status || f.tip || f.grup || f.de || f.pana
   const termenDepasit = (d) => d.termen_raspuns && d.termen_raspuns < azi() && !['solutionat', 'arhivat', 'anulat'].includes(d.status)
 
   return (
@@ -84,14 +87,19 @@ export default function RegistruLista({ registru, role, comune, filtre, setFiltr
       <Titlu
         actiuni={
           esteStaff(role) && (
-            <button className={btnPrimary} onClick={onNou}>
-              <Plus size={15} /> {info.nou}
-            </button>
+            <>
+              <LocLiber registru={registru} role={role} serii={comune.serii} serieImplicita={f.serie} onGata={onLiber} />
+              <button className={btnPrimary} onClick={() => onNou(f.serie)}>
+                <Plus size={15} /> {info.nou}
+              </button>
+            </>
           )
         }
       >
         Registrul de {info.label.toLowerCase()}
       </Titlu>
+
+      <SerieChips serii={comune.serii} valoare={f.serie} onChange={(v) => set('serie', v)} />
 
       <Card>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -112,7 +120,7 @@ export default function RegistruLista({ registru, role, comune, filtre, setFiltr
             <label className={labelCls} htmlFor="status">Status</label>
             <select id="status" className={inputCls} value={f.status} onChange={(e) => set('status', e.target.value)}>
               <option value="">Toate</option>
-              {[...FLUX[registru], 'anulat'].map((s) => <option key={s} value={s}>{STATUSURI[s].label}</option>)}
+              {[...FLUX[registru], 'liber', 'anulat'].map((s) => <option key={s} value={s}>{STATUSURI[s].label}</option>)}
             </select>
           </div>
           <div>
@@ -148,7 +156,7 @@ export default function RegistruLista({ registru, role, comune, filtre, setFiltr
       <Eroare>{eroare}</Eroare>
 
       <Card className="overflow-x-auto p-0">
-        <table className="w-full min-w-[760px] text-left text-sm">
+        <table className="w-full min-w-[860px] text-left text-sm">
           <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
             <tr>
               <th className="px-4 py-2.5 font-semibold">Număr</th>
@@ -158,37 +166,60 @@ export default function RegistruLista({ registru, role, comune, filtre, setFiltr
               <th className="px-4 py-2.5 font-semibold">{registru === 'intrari' ? 'Repartizat către' : 'Inițiator'}</th>
               {registru === 'intrari' && <th className="px-4 py-2.5 font-semibold">Termen</th>}
               <th className="px-4 py-2.5 font-semibold">Status</th>
+              <th className="px-4 py-2.5"><span className="sr-only">Acțiuni</span></th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((d) => (
-              <tr key={d.id} tabIndex={0} onClick={() => onDeschide(d.id)} onKeyDown={(e) => e.key === 'Enter' && onDeschide(d.id)}
-                className="cursor-pointer border-b border-slate-100 last:border-0 hover:bg-slate-50 focus-ring">
-                <td className="whitespace-nowrap px-4 py-2.5 font-semibold text-accent">
-                  {d.numar_afisat}
-                  {d.confidential && <Lock size={12} className="ml-1.5 inline text-slate-400" aria-label="Confidențial" />}
-                </td>
-                <td className="whitespace-nowrap px-4 py-2.5 text-slate-600">{formatData(d.data_inreg)}</td>
-                <td className="px-4 py-2.5">{d.contact_denumire}</td>
-                <td className="max-w-xs truncate px-4 py-2.5" title={d.obiect}>{d.obiect}</td>
-                <td className="px-4 py-2.5 text-slate-600">{numeResponsabil(comune, d)}</td>
-                {registru === 'intrari' && (
-                  <td className={`whitespace-nowrap px-4 py-2.5 ${termenDepasit(d) ? 'font-semibold text-rose-600' : 'text-slate-600'}`}>
-                    {formatData(d.termen_raspuns)}
+            {rows.map((d) => {
+              const liber = d.status === 'liber'
+              const staff = esteStaff(role)
+              const poateEdita = staff && !['anulat', 'arhivat', 'liber'].includes(d.status)
+              return (
+                <tr key={d.id} tabIndex={0} onClick={() => (liber ? staff && onEdit(d) : onDeschide(d.id))} onKeyDown={(e) => e.key === 'Enter' && (liber ? staff && onEdit(d) : onDeschide(d.id))}
+                  className={`cursor-pointer border-b border-slate-100 last:border-0 hover:bg-slate-50 focus-ring ${liber ? 'bg-orange-50/40' : ''}`}>
+                  <td className="whitespace-nowrap px-4 py-2.5 font-semibold text-accent">
+                    {d.numar_afisat}
+                    {d.confidential && <Lock size={12} className="ml-1.5 inline text-slate-400" aria-label="Confidențial" />}
                   </td>
-                )}
-                <td className="px-4 py-2.5"><StareBadge stare={d.status} /></td>
-              </tr>
-            ))}
+                  <td className="whitespace-nowrap px-4 py-2.5 text-slate-600">{formatData(d.data_inreg)}</td>
+                  {liber ? (
+                    <>
+                      <td className="px-4 py-2.5 italic text-slate-400">Loc liber</td>
+                      <td className="px-4 py-2.5 italic text-slate-400">rezervat, necompletat</td>
+                      <td className="px-4 py-2.5 text-slate-300">—</td>
+                      {registru === 'intrari' && <td className="px-4 py-2.5 text-slate-300">—</td>}
+                    </>
+                  ) : (
+                    <>
+                      <td className="px-4 py-2.5">{d.contact_denumire}</td>
+                      <td className="max-w-xs truncate px-4 py-2.5" title={d.obiect}>{d.obiect}</td>
+                      <td className="px-4 py-2.5 text-slate-600">{numeResponsabil(comune, d)}</td>
+                      {registru === 'intrari' && (
+                        <td className={`whitespace-nowrap px-4 py-2.5 ${termenDepasit(d) ? 'font-semibold text-rose-600' : 'text-slate-600'}`}>
+                          {formatData(d.termen_raspuns)}
+                        </td>
+                      )}
+                    </>
+                  )}
+                  <td className="px-4 py-2.5"><StareBadge stare={d.status} /></td>
+                  <td className="whitespace-nowrap px-4 py-2.5 text-right">
+                    {liber && staff && <button className={btnPrimary} onClick={(e) => { e.stopPropagation(); onEdit(d) }}>Completează</button>}
+                    {poateEdita && (
+                      <button className={btnGhost} onClick={(e) => { e.stopPropagation(); onEdit(d) }}><Pencil size={13} /> Editează</button>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
             {!loading && rows.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-slate-500">
+                <td colSpan={9} className="px-4 py-8 text-center text-slate-500">
                   {filtrat ? 'Niciun document nu se potrivește filtrelor.' : `Nu există încă documente în registrul de ${info.label.toLowerCase()} pe ${f.an}.`}
                 </td>
               </tr>
             )}
             {loading && (
-              <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-400">Se încarcă…</td></tr>
+              <tr><td colSpan={9} className="px-4 py-8 text-center text-slate-400">Se încarcă…</td></tr>
             )}
           </tbody>
         </table>

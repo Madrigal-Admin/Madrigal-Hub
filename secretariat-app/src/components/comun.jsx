@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Check } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Check, X } from 'lucide-react'
 import { MOD_SEMNARE_SCURT, STARE_SEMNATAR, STATUSURI } from '../lib/roluri'
 import { btnGhost, btnPrimary, inputCls, labelCls } from '../lib/ui'
 
@@ -134,5 +134,30 @@ export function PasiStare({ pasi, curent, rosu = false, permis, onPick }) {
         )
       })}
     </ol>
+  )
+}
+
+// Fereastră (pop-up) deasupra paginii. Se închide doar din X sau cu Escape, nu la clic în afară (ca să nu se piardă ce ai scris).
+export function Fereastra({ titlu, subtitlu, children, onInchide, latime = 'max-w-3xl' }) {
+  useEffect(() => {
+    const tasta = (e) => { if (e.key === 'Escape') onInchide() }
+    document.addEventListener('keydown', tasta)
+    return () => document.removeEventListener('keydown', tasta)
+  }, [onInchide])
+  return (
+    <div className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-slate-900/45 p-3 md:p-10">
+      <div role="dialog" aria-modal="true" aria-label={titlu} className={`w-full ${latime} rounded-2xl bg-white shadow-2xl`}>
+        <div className="flex items-start gap-3 border-b border-slate-100 px-6 py-4">
+          <div>
+            <h2 className="text-xl font-extrabold tracking-tight text-slate-900">{titlu}</h2>
+            {subtitlu && <p className="mt-0.5 text-[13px] text-slate-500">{subtitlu}</p>}
+          </div>
+          <button type="button" aria-label="Închide fereastra" onClick={onInchide} className="ml-auto rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 focus-ring">
+            <X size={20} />
+          </button>
+        </div>
+        <div className="px-6 py-5">{children}</div>
+      </div>
+    </div>
   )
 }

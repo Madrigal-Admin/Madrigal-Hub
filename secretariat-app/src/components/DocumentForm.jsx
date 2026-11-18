@@ -1,21 +1,24 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import { MOD_SEMNARE, REGISTRE, esteStaff } from '../lib/roluri'
-import { azi, mesajEroare } from '../lib/util'
+import { azi, formatData, mesajEroare } from '../lib/util'
 import { BUCKET } from '../lib/fisiere'
 import { btnGhost, btnPrimary, inputCls, labelCls } from '../lib/ui'
-import { Card, Eroare, Info, Titlu } from './comun'
+import { Eroare, Info } from './comun'
+import { SerieSelect } from './Serii'
 import { AngajatiMulti, ContactPicker, DocPicker, RespPicker } from './Pickere'
 
 const FARA_NUMAR = 'fără număr'
 
 // Formular de înregistrare (doc = null) sau de modificare (doc = documentul existent).
-export default function DocumentForm({ registru, doc, prefill, role, comune, onSalvat, onRenunta }) {
+export default function DocumentForm({ registru, doc, prefill, serieImplicita, role, comune, onSalvat, onRenunta }) {
   const info = REGISTRE[registru]
   const editare = !!doc
+  const completare = doc?.status === 'liber' // loc liber rezervat, care se completează acum
   const intrari = registru === 'intrari'
   const [f, setF] = useState(() => ({
-    data_inreg: azi(),
+    serie_id: doc?.serie_id || prefill?.serie_id || serieImplicita || '',
+    data_inreg: completare ? doc.data_inreg : azi(),
     data_document: doc?.data_document || '',
     nr_document_extern: doc?.nr_document_extern || '',
     fara_numar: doc?.nr_document_extern === FARA_NUMAR,
@@ -51,6 +54,7 @@ export default function DocumentForm({ registru, doc, prefill, role, comune, onS
   async function salveaza(e) {
     e.preventDefault()
     setEroare('')
+    if (!editare && !f.serie_id) return setEroare('Alege seria documentului.')
     setBusy(true)
     const payload = {
       contact_id: f.contact?.id || '',
@@ -72,8 +76,17 @@ export default function DocumentForm({ registru, doc, prefill, role, comune, onS
     }
     let res
     if (editare) {
+      if (completare) payload.data_inreg = f.data_inreg
       res = await supabase.rpc('sec_actualizeaza', { p_id: doc.id, p_date: payload })
+      if (!res.error && completare && f.confidential) {
+        const c = await supabase.rpc('sec_seteaza_confidential', { p_id: doc.id, p_conf: true, p_angajati: f.acces })
+        if (c.error) {
+          setBusy(false)
+          return setAvertisment({ id: doc.id, mesaj: `Documentul a fost completat, dar marcajul „confidențial” nu a putut fi salvat: ${mesajEroare(c.error)}. Deschide documentul și setează-l din secțiunea Confidențialitate.` })
+        }
+      }
     } else {
+      payload.serie_id = f.serie_id
       payload.data_inreg = f.data_inreg
       payload.confidential = f.confidential
       payload.acces = f.confidential ? f.acces : []
@@ -90,11 +103,11 @@ export default function DocumentForm({ registru, doc, prefill, role, comune, onS
       const v = c.error ? c : await supabase.rpc('sec_adauga_versiune', { p_doc: nou.id, p_path: dest, p_nume: prefill.fisier.nume })
       if (v.error) {
         setBusy(false)
-        return setAvertisment({ id: nou.id, mesaj: `Ieșirea a fost înregistrată ca ${nou.nr}/${nou.an}, dar fișierul semnat nu a putut fi copiat: ${mesajEroare(v.error)}. Deschide documentul și încarcă fișierul manual.` })
+        return setAvertisment({ id: nou.id, mesaj: `Ieșirea a fost înregistrată (${nou.nr}/${nou.an}), dar fișierul semnat nu a putut fi copiat: ${mesajEroare(v.error)}. Deschide documentul și încarcă fișierul manual.` })
       }
     }
     setBusy(false)
-    onSalvat(res.data.id)
+    onSalvat(res.data.id, res.data)
   }
 
   const canaleActive = comune.canale.filter((c) => c.activ || c.id === f.canal_id)
@@ -103,10 +116,9 @@ export default function DocumentForm({ registru, doc, prefill, role, comune, onS
 
   return (
     <form onSubmit={salveaza} className="space-y-4">
-      <Titlu>{editare ? `Modificare ${doc.numar_afisat}` : info.nou}</Titlu>
       {!esteStaff(role) && <Eroare>Nu ai dreptul să înregistrezi sau să modifici documente.</Eroare>}
-      {!editare && (
-        <Info>Numărul se acordă automat la salvare. După înregistrare poți încărca scanul documentului.</Info>
+      {completare && (
+        <Info>Loc liber rezervat la {formatData(doc.data_inreg)}. Completează detaliile documentului; numărul rămâne {doc.numar_afisat}.</Info>
       )}
       {circuit && (
         <Info>
@@ -121,13 +133,23 @@ export default function DocumentForm({ registru, doc, prefill, role, comune, onS
         </div>
       )}
 
-      <Card className="space-y-4">
-        {!editare && (
+      <div className="space-y-4">
+        <div className="grid gap-4 sm:grid-cols-2">
+          {editare ? (
+            <div>
+              <label className={labelCls} htmlFor="serie_fix">Serie</label>
+              <input id="serie_fix" className={inputCls} value={`${doc.serie_cod} — ${doc.serie_denumire}`} disabled />
+            </div>
+          ) : (
+            <SerieSelect serii={comune.serii} valoare={f.serie_id} onChange={(v) => set('serie_id', v)} />
+          )}
+        </div>
+        {(!editare || completare) && (
           <div className="max-w-xs">
             <label className={labelCls} htmlFor="data_inreg">Data înregistrării</label>
             <input id="data_inreg" type="date" className={inputCls} value={f.data_inreg} min={`${anCurent}-01-01`} max={azi()}
               onChange={(e) => set('data_inreg', e.target.value)} required />
-            <p className="mt-1 text-xs text-slate-500">Implicit azi. Poți pune o dată din trecut (din anul curent) pentru un document primit mai demult.</p>
+            <p className="mt-1 text-xs text-slate-500">Implicit azi. Poți pune o dată din trecut (din anul curent).</p>
           </div>
         )}
 
@@ -221,7 +243,7 @@ export default function DocumentForm({ registru, doc, prefill, role, comune, onS
           </div>
         </div>
 
-        {!editare && (
+        {(!editare || completare) && (
           <div className="space-y-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
             <label className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
               <input type="checkbox" checked={f.confidential} onChange={(e) => set('confidential', e.target.checked)} /> Document confidențial
@@ -236,10 +258,10 @@ export default function DocumentForm({ registru, doc, prefill, role, comune, onS
             )}
           </div>
         )}
-      </Card>
+      </div>
 
       <div className="flex gap-2">
-        <button type="submit" className={btnPrimary} disabled={busy || !esteStaff(role)}>{editare ? 'Salvează modificările' : 'Înregistrează'}</button>
+        <button type="submit" className={btnPrimary} disabled={busy || !esteStaff(role)}>{completare ? 'Completează' : editare ? 'Salvează modificările' : 'Salvează'}</button>
         <button type="button" className={btnGhost} onClick={onRenunta}>Renunță</button>
       </div>
     </form>

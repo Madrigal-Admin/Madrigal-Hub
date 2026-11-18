@@ -12,7 +12,7 @@ export default function App() {
   const [angajat, setAngajat] = useState(null)
   const [nav, setNav] = useState({ view: '', params: null })
   const [checkingRole, setCheckingRole] = useState(false)
-  const [comune, setComune] = useState({ angajati: [], grupuri: [], tipuri: [], canale: [] })
+  const [comune, setComune] = useState({ angajati: [], grupuri: [], tipuri: [], canale: [], serii: [] })
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session))
@@ -34,17 +34,19 @@ export default function App() {
 
   // Listele folosite în formulare și filtre (angajați, departamente, tipuri, canale)
   const incarcaComune = useCallback(async () => {
-    const [ang, grp, tip, can] = await Promise.all([
+    const [ang, grp, tip, can, ser] = await Promise.all([
       supabase.from('angajati').select('id, nume_complet, activ').order('nume_complet'),
       supabase.rpc('sec_grupuri_lista'),
       supabase.from('sec_tipuri_document').select('*').order('ordine').order('denumire'),
       supabase.from('sec_canale').select('*').order('ordine').order('denumire'),
+      supabase.from('sec_serii').select('*').order('ordine').order('cod'),
     ])
     setComune({
       angajati: ang.data || [],
       grupuri: grp.data || [],
       tipuri: tip.data || [],
       canale: can.data || [],
+      serii: ser.data || [],
     })
   }, [])
 
