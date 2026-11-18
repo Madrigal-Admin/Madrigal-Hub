@@ -151,6 +151,31 @@ function useModCompact(tooluri, activ) {
 
 export default function HubHeader({ nume, tooluri, activ, onNavigate, onGhid, onSignOut }) {
   const { nav, lista, mod, deruleaza } = useModCompact(tooluri, activ)
+  const lis = useRef({})
+  const [hov, setHov] = useState(null) // { key, w, sq } — tool-ul peste care e mouse-ul, lățimea lui deschisă, dacă vecinii trebuie să se strângă
+  useEffect(() => { setHov(null) }, [mod, tooluri, activ])
+  // Animațiile de lățime pornesc doar după ce bara s-a așezat (altfel măsurătoarea de la încărcare ar vedea valori intermediare).
+  const [anim, setAnim] = useState(false)
+  useEffect(() => {
+    setAnim(false)
+    const timer = setTimeout(() => setAnim(true), 350)
+    return () => clearTimeout(timer)
+  }, [mod, tooluri, activ])
+  const latimeDeschisa = (key) => {
+    const li = lis.current[key]
+    const sp = li?.querySelector('span')
+    return sp ? Math.ceil(19 + 8 + sp.offsetWidth + 24) : 40
+  }
+  const intra = (key) => {
+    if (mod === 0 || !lista.current) return
+    const gap = mod === 2 ? 4 : 6
+    const w = latimeDeschisa(key)
+    // lățimea barei în repaus: cele cu nume (activul, în modul 1) cât au, restul 40 px
+    const repaus = tooluri.reduce((suma, t) => suma + ((mod === 1 && t.key === activ) ? (lis.current[t.key]?.offsetWidth || 40) : 40), 0) + gap * (tooluri.length - 1) + 4
+    const liber = lista.current.parentElement.clientWidth - repaus
+    setHov({ key, w, sq: w - 40 > liber })
+  }
+  const iese = () => setHov(null)
   const acasa = { href: '/', view: 'dashboard', curent: activ === 'acasa' }
   return (
     <>
@@ -176,17 +201,24 @@ export default function HubHeader({ nume, tooluri, activ, onNavigate, onGhid, on
           </div>
           {/* centrat prin margini automate: dacă nu încape, începe de la margine și se derulează */}
           <div className="flex min-w-0">
-            <ul ref={lista} className={`m-0 mx-auto flex max-w-full list-none items-center ${mod === 2 ? 'gap-1' : 'gap-1.5'} p-0.5 [scrollbar-width:thin] ${deruleaza ? 'overflow-x-auto' : ''}`}>
+            <ul ref={lista} className={`m-0 mx-auto flex max-w-full list-none items-center ${hov?.sq ? 'gap-px' : mod === 2 ? 'gap-1' : 'gap-1.5'} ${anim ? 'transition-[gap] duration-200' : ''} p-0.5 [scrollbar-width:thin] ${deruleaza ? 'overflow-x-auto' : ''}`}>
               {tooluri.map((t) => {
                 const aprins = t.key === activ
                 const cuNume = mod === 0 || (mod === 1 && aprins)
-                // Doar iconiță: la trecerea cu mouse-ul (sau cu tastatura) se extinde peste vecini și arată numele, fără să mute restul barei.
-                const extinde = 'w-10 justify-center hover:absolute hover:left-0 hover:top-0 hover:z-30 hover:w-auto hover:justify-start hover:px-3 hover:shadow-md hover:ring-1 hover:ring-[#E1E4EA] focus-visible:absolute focus-visible:left-0 focus-visible:top-0 focus-visible:z-30 focus-visible:w-auto focus-visible:justify-start focus-visible:px-3 focus-visible:shadow-md'
+                // Doar iconiță: la hover (sau focus cu tastatura) iconița se lățește animat și arată numele; vecinii fac loc
+                // (se depărtează, iar dacă bara nu mai are loc liber se strâng puțin) — nimic nu e acoperit.
+                const deschis = !cuNume && hov?.key === t.key
+                const strans = !cuNume && !!hov && !deschis && hov.sq
+                const latime = cuNume ? undefined : deschis ? hov.w : strans ? 26 : 40
+                const pad = cuNume ? (mod === 0 ? 'px-4' : 'px-3') : deschis ? 'px-3' : strans ? 'px-[3px]' : 'px-[10px]'
                 return (
-                  <li key={t.key} className={`shrink-0 ${cuNume ? '' : 'group relative h-11 w-10'}`}>
-                    <Legatura item={{ ...t, curent: aprins }} onNavigate={onNavigate} titlu={t.label} className={`inline-flex h-11 items-center gap-2 whitespace-nowrap rounded-full text-sm no-underline ${cuNume ? (mod === 0 ? 'px-4' : 'px-3') : extinde} ${aprins ? 'bg-[#DCE6F5] font-extrabold text-[#22406B]' : 'font-semibold text-[#3A465C] hover:bg-[#EEF1F6]'} ${FOCUS}`}>
+                  <li key={t.key} ref={(el) => { lis.current[t.key] = el }} style={latime ? { width: latime } : undefined}
+                    onMouseEnter={cuNume ? undefined : () => intra(t.key)} onMouseLeave={cuNume ? undefined : iese}
+                    onFocus={cuNume ? undefined : () => intra(t.key)} onBlur={cuNume ? undefined : iese}
+                    className={`shrink-0 ${cuNume ? '' : `h-11 ${anim ? 'transition-[width] duration-200 ease-out motion-reduce:transition-none' : ''}`}`}>
+                    <Legatura item={{ ...t, curent: aprins }} onNavigate={onNavigate} titlu={t.label} className={`inline-flex h-11 items-center gap-2 whitespace-nowrap rounded-full text-sm no-underline ${cuNume ? '' : `w-full overflow-hidden ${anim ? 'transition-[padding] duration-200 motion-reduce:transition-none' : ''}`} ${pad} ${aprins ? 'bg-[#DCE6F5] font-extrabold text-[#22406B]' : `font-semibold text-[#3A465C] ${deschis ? 'bg-[#EEF1F6]' : 'hover:bg-[#EEF1F6]'}`} ${FOCUS}`}>
                       <Icon name={t.icon} strokeWidth={aprins ? 2.1 : 1.8} />
-                      {cuNume ? <span>{t.label}</span> : <span className="hidden group-hover:inline group-focus-within:inline">{t.label}</span>}
+                      {cuNume ? <span>{t.label}</span> : <span aria-hidden="true" className={`shrink-0 transition-opacity duration-150 ${deschis ? 'opacity-100' : 'opacity-0'}`}>{t.label}</span>}
                     </Legatura>
                   </li>
                 )
