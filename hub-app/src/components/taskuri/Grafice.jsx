@@ -21,13 +21,13 @@ export function Placinta({ titlu, felii, gol = 'Nu sunt taskuri.' }) {
   const L = 2 * Math.PI * R
   let deplasare = 0
   return (
-    <section className="min-w-0 rounded-[14px] border border-[#E1E4EA] bg-white p-4 sm:p-5" aria-label={titlu}>
+    <section className="flex min-w-0 flex-col rounded-[14px] border border-[#E1E4EA] bg-white p-4 sm:p-5" aria-label={titlu}>
       <h3 className="text-[15px] font-extrabold text-[#172036]">{titlu}</h3>
       {total === 0 ? (
         <p className="mt-4 text-sm text-[#5B6578]">{gol}</p>
       ) : (
-        <div className="mt-2 flex min-h-[200px] flex-wrap items-center justify-center gap-x-7 gap-y-3">
-          <svg viewBox="0 0 190 190" className="h-[180px] w-[180px] shrink-0" role="img" aria-label={`${titlu}: ${vizibile.map((f) => `${f.nume} ${f.valoare}`).join(', ')}`}>
+        <div className="flex flex-1 flex-wrap items-center justify-center gap-x-10 gap-y-4 py-2">
+          <svg viewBox="0 0 190 190" className="aspect-square w-full max-w-[260px] shrink-0 sm:w-[260px]" role="img" aria-label={`${titlu}: ${vizibile.map((f) => `${f.nume} ${f.valoare}`).join(', ')}`}>
             <circle cx="95" cy="95" r={R} fill="none" stroke="#EEF1F6" strokeWidth="26" />
             {vizibile.map((f) => {
               const lung = (f.valoare / total) * L
@@ -41,9 +41,9 @@ export function Placinta({ titlu, felii, gol = 'Nu sunt taskuri.' }) {
             <text x="95" y="99" textAnchor="middle" fontSize="34" fontWeight="800" fill="#172036">{total}</text>
             <text x="95" y="121" textAnchor="middle" fontSize="12" fill="#5B6578">taskuri</text>
           </svg>
-          <ul className="space-y-2.5 text-sm">
+          <ul className="space-y-3 text-[15px]">
             {felii.map((f) => (
-              <li key={f.nume} className="grid grid-cols-[12px_minmax(70px,auto)_28px_44px] items-center gap-2">
+              <li key={f.nume} className="grid grid-cols-[12px_minmax(80px,auto)_32px_48px] items-center gap-2.5">
                 <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: f.culoare }} />
                 <span className="truncate text-[#3A465C]" title={f.nume}>{f.nume}</span>
                 <b className="text-right text-[#172036]">{f.valoare}</b>

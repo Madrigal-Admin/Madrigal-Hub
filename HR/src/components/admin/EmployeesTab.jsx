@@ -659,6 +659,14 @@ function HrProfileEditor({ angajat, attributions, departments, positions, onClos
                     </select>
                   </div>
                   <div>
+                    <label className="mb-1 block text-xs font-medium text-slate-600">Numărul contractului</label>
+                    <input
+                      value={cf.numar_contract}
+                      onChange={(e) => updC('numar_contract', e.target.value)}
+                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus-ring"
+                    />
+                  </div>
+                  <div>
                     <label className="mb-1 block text-xs font-medium text-slate-600">Data început contract</label>
                     <input
                       type="date"
@@ -714,14 +722,6 @@ function HrProfileEditor({ angajat, attributions, departments, positions, onClos
                       </p>
                     </div>
                   )}
-                  <div>
-                    <label className="mb-1 block text-xs font-medium text-slate-600">Numărul contractului</label>
-                    <input
-                      value={cf.numar_contract}
-                      onChange={(e) => updC('numar_contract', e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus-ring"
-                    />
-                  </div>
                 </div>
 
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">

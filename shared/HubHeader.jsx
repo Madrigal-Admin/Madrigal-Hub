@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import Icon from './Icons'
 import { GHID } from './tooluri'
 
@@ -6,7 +6,7 @@ import { GHID } from './tooluri'
 //  • rândul de sus: logo (stânga), „Hub Madrigal" (centru), numele + deconectare (dreapta);
 //  • rândul de tool-uri: „Acasă" mereu în stânga, „Ghidul angajatului" mereu în dreapta, iar lista
 //    de tool-uri centrată între ele — oricâte ar fi. Rândul nu se împarte niciodată pe două linii:
-//    dacă lista nu încape, se derulează pe orizontală.
+//    bara se adaptează singură la lățime, fără bară de derulare: întâi nume complete; dacă nu încap, iconițe cu numele doar la tool-ul activ; dacă nici așa, doar iconițe (titlul apare la trecerea cu mouse-ul).
 //  • pe telefon: bară de jos (Acasă / Calendar / Tool-uri).
 //
 // props: nume, tooluri (din construiesteTooluri), activ (cheia tool-ului curent; „acasa" pentru pagina de start),
@@ -122,12 +122,37 @@ function BaraJos({ tooluri, activ, onNavigate, onGhid }) {
   )
 }
 
+// Alege singur cât de compactă e lista de tool-uri: 0 = nume complete, 1 = iconițe + numele celui activ,
+// 2 = doar iconițe. Pornește de la 0 la fiecare schimbare de lățime și trece la următorul nivel cât timp se derulează.
+function useModCompact(tooluri, activ) {
+  const nav = useRef(null)
+  const lista = useRef(null)
+  const [mod, setMod] = useState(0)
+  const [lat, setLat] = useState(0)
+  useEffect(() => {
+    if (!nav.current || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver((e) => {
+      const w = Math.round(e[0].contentRect.width)
+      setLat((v) => { if (v !== w) setMod(0); return w })
+    })
+    ro.observe(nav.current)
+    return () => ro.disconnect()
+  }, [])
+  useLayoutEffect(() => {
+    const el = lista.current
+    if (el && mod < 2 && el.scrollWidth > el.clientWidth + 1) setMod(mod + 1)
+  }, [mod, lat, tooluri, activ])
+  useEffect(() => { setMod(0) }, [tooluri, activ])
+  return { nav, lista, mod }
+}
+
 export default function HubHeader({ nume, tooluri, activ, onNavigate, onGhid, onSignOut }) {
+  const { nav, lista, mod } = useModCompact(tooluri, activ)
   const acasa = { href: '/', view: 'dashboard', curent: activ === 'acasa' }
   return (
     <>
       <header className="bg-white">
-        <div className="grid h-16 grid-cols-[1fr_auto_1fr] items-center gap-3 border-b border-[#E1E4EA] px-4 sm:px-8">
+        <div className="grid h-16 grid-cols-[1fr_auto_1fr] items-center gap-3 border-b border-[#E1E4EA] px-4 md:px-8">
           <a href="/" onClick={onNavigate ? (e) => { e.preventDefault(); onNavigate('dashboard') } : undefined} className="justify-self-start">
             <img src="/assets/logo-madrigal.png" alt="Madrigal — acasă" className="h-9 w-auto" />
           </a>
@@ -140,7 +165,7 @@ export default function HubHeader({ nume, tooluri, activ, onNavigate, onGhid, on
           </div>
         </div>
 
-        <nav aria-label="Tool-uri" className="hidden grid-cols-[112px_minmax(0,1fr)_112px] items-center gap-3 border-b border-[#E1E4EA] px-8 py-2.5 sm:grid lg:grid-cols-[200px_minmax(0,1fr)_200px]">
+        <nav ref={nav} aria-label="Tool-uri" className="hidden grid-cols-[112px_minmax(0,1fr)_112px] items-center gap-3 border-b border-[#E1E4EA] px-4 py-2.5 md:px-8 sm:grid lg:grid-cols-[200px_minmax(0,1fr)_200px]">
           <div className="flex justify-start">
             <Legatura item={acasa} onNavigate={onNavigate} className={`inline-flex h-11 items-center gap-2 whitespace-nowrap rounded-full bg-[#22406B] px-4 text-sm font-bold text-white no-underline hover:bg-[#142846] ${FOCUS}`}>
               <Icon name="home" strokeWidth={2} /> Acasă
@@ -148,13 +173,13 @@ export default function HubHeader({ nume, tooluri, activ, onNavigate, onGhid, on
           </div>
           {/* centrat prin margini automate: dacă nu încape, începe de la margine și se derulează */}
           <div className="flex min-w-0">
-            <ul className="m-0 mx-auto flex max-w-full list-none items-center gap-1.5 overflow-x-auto p-0.5 [scrollbar-width:thin]">
+            <ul ref={lista} className="m-0 mx-auto flex max-w-full list-none items-center gap-1.5 overflow-x-auto p-0.5 [scrollbar-width:thin]">
               {tooluri.map((t) => {
                 const aprins = t.key === activ
                 return (
                   <li key={t.key} className="shrink-0">
-                    <Legatura item={{ ...t, curent: aprins }} onNavigate={onNavigate} titlu={t.label} className={`inline-flex h-11 items-center gap-2 whitespace-nowrap rounded-full px-3 text-sm no-underline min-[1100px]:px-4 ${aprins ? 'bg-[#DCE6F5] font-extrabold text-[#22406B]' : 'font-semibold text-[#3A465C] hover:bg-[#EEF1F6]'} ${FOCUS}`}>
-                      <Icon name={t.icon} strokeWidth={aprins ? 2.1 : 1.8} /> <span className={aprins ? '' : 'hidden min-[1100px]:inline'}>{t.label}</span>
+                    <Legatura item={{ ...t, curent: aprins }} onNavigate={onNavigate} titlu={t.label} className={`inline-flex h-11 items-center gap-2 whitespace-nowrap rounded-full text-sm no-underline ${mod === 0 ? 'px-4' : mod === 1 ? 'px-3' : 'px-2.5'} ${aprins ? 'bg-[#DCE6F5] font-extrabold text-[#22406B]' : 'font-semibold text-[#3A465C] hover:bg-[#EEF1F6]'} ${FOCUS}`}>
+                      <Icon name={t.icon} strokeWidth={aprins ? 2.1 : 1.8} /> {(mod === 0 || (mod === 1 && aprins)) && <span>{t.label}</span>}
                     </Legatura>
                   </li>
                 )
