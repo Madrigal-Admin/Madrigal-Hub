@@ -1,3 +1,5 @@
+import { useMemo, useState } from 'react'
+
 // Grafice simple desenate direct în SVG/HTML (fără biblioteci), folosite de dashboardurile
 // „Evenimentele mele" și „Echipa mea".
 export const CULORI_STATUS = { de_facut: '#9AA6B8', in_lucru: '#E0A21B', terminat: '#2E9E6B', anulat: '#D5D9E0' }
@@ -11,35 +13,41 @@ function felieSvg(cx, cy, r, a0, a1) {
   return `M${cx},${cy} L${x0},${y0} A${r},${r} 0 ${a1 - a0 > Math.PI ? 1 : 0} 1 ${x1},${y1} Z`
 }
 
-// felii: [{ nume, valoare, culoare }]
+// felii: [{ nume, valoare, culoare }] — inel cu totalul în mijloc, legenda lângă el (nume, număr, procent).
 export function Placinta({ titlu, felii, gol = 'Nu sunt taskuri.' }) {
   const vizibile = felii.filter((f) => f.valoare > 0)
   const total = vizibile.reduce((s, f) => s + f.valoare, 0)
-  let unghi = 0
+  const R = 70
+  const L = 2 * Math.PI * R
+  let deplasare = 0
   return (
     <section className="min-w-0 rounded-[14px] border border-[#E1E4EA] bg-white p-4 sm:p-5" aria-label={titlu}>
       <h3 className="text-[15px] font-extrabold text-[#172036]">{titlu}</h3>
       {total === 0 ? (
         <p className="mt-4 text-sm text-[#5B6578]">{gol}</p>
       ) : (
-        <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-3">
-          <svg viewBox="0 0 100 100" className="h-36 w-36 shrink-0" role="img" aria-label={`${titlu}: ${vizibile.map((f) => `${f.nume} ${f.valoare}`).join(', ')}`}>
-            {vizibile.length === 1 ? (
-              <circle cx="50" cy="50" r="46" fill={vizibile[0].culoare} />
-            ) : (
-              vizibile.map((f) => {
-                const a0 = unghi
-                unghi += (f.valoare / total) * Math.PI * 2
-                return <path key={f.nume} d={felieSvg(50, 50, 46, a0, unghi)} fill={f.culoare} stroke="#fff" strokeWidth="1.2" />
-              })
-            )}
+        <div className="mt-2 flex min-h-[200px] flex-wrap items-center justify-center gap-x-7 gap-y-3">
+          <svg viewBox="0 0 190 190" className="h-[180px] w-[180px] shrink-0" role="img" aria-label={`${titlu}: ${vizibile.map((f) => `${f.nume} ${f.valoare}`).join(', ')}`}>
+            <circle cx="95" cy="95" r={R} fill="none" stroke="#EEF1F6" strokeWidth="26" />
+            {vizibile.map((f) => {
+              const lung = (f.valoare / total) * L
+              const el = (
+                <circle key={f.nume} cx="95" cy="95" r={R} fill="none" stroke={f.culoare} strokeWidth="26" transform="rotate(-90 95 95)"
+                  strokeDasharray={`${vizibile.length === 1 ? L : Math.max(lung - 3, 0.5)} ${L}`} strokeDashoffset={-deplasare} />
+              )
+              deplasare += lung
+              return el
+            })}
+            <text x="95" y="99" textAnchor="middle" fontSize="34" fontWeight="800" fill="#172036">{total}</text>
+            <text x="95" y="121" textAnchor="middle" fontSize="12" fill="#5B6578">taskuri</text>
           </svg>
-          <ul className="min-w-[150px] flex-1 space-y-1.5 text-sm">
-            {vizibile.map((f) => (
-              <li key={f.nume} className="flex items-center gap-2">
-                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: f.culoare }} />
-                <span className="min-w-0 flex-1 truncate text-[#3A465C]" title={f.nume}>{f.nume}</span>
-                <span className="font-bold text-[#172036]">{f.valoare}</span>
+          <ul className="space-y-2.5 text-sm">
+            {felii.map((f) => (
+              <li key={f.nume} className="grid grid-cols-[12px_minmax(70px,auto)_28px_44px] items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: f.culoare }} />
+                <span className="truncate text-[#3A465C]" title={f.nume}>{f.nume}</span>
+                <b className="text-right text-[#172036]">{f.valoare}</b>
+                <span className="text-right text-[13px] text-[#5B6578]">{Math.round((f.valoare / total) * 100)}%</span>
               </li>
             ))}
           </ul>
@@ -125,5 +133,91 @@ export function Casete({ elemente }) {
         </div>
       ))}
     </div>
+  )
+}
+
+const LUNI_SCURT = ['ian', 'feb', 'mar', 'apr', 'mai', 'iun', 'iul', 'aug', 'sep', 'oct', 'nov', 'dec']
+const LUNI_STATUS = [
+  { cod: 'de_facut', nume: 'De făcut', culoare: CULORI_STATUS.de_facut },
+  { cod: 'in_lucru', nume: 'În lucru', culoare: CULORI_STATUS.in_lucru },
+  { cod: 'terminat', nume: 'Terminat', culoare: CULORI_STATUS.terminat },
+]
+
+// Taskuri pe luni (ultimele 12, după termen), stivuite pe status; filtru opțional pe persoană.
+// persoane: [{ id, nume }]
+export function TaskuriPeLuni({ titlu = 'Taskuri pe luni', taskuri, persoane }) {
+  const [persoana, setPersoana] = useState('')
+  const luni = useMemo(() => {
+    const acum = new Date()
+    const lista = []
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(acum.getFullYear(), acum.getMonth() - i, 1)
+      lista.push({ cheie: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`, luna: d.getMonth(), an: d.getFullYear() })
+    }
+    return lista
+  }, [])
+  const date = useMemo(() => {
+    const per = Object.fromEntries(luni.map((l) => [l.cheie, { de_facut: 0, in_lucru: 0, terminat: 0 }]))
+    for (const t of taskuri) {
+      if (!t.termen || (persoana && t.responsabil_id !== persoana)) continue
+      const c = per[t.termen.slice(0, 7)]
+      if (c && c[t.status] !== undefined) c[t.status]++
+    }
+    return luni.map((l) => ({ ...l, ...per[l.cheie] }))
+  }, [taskuri, persoana, luni])
+
+  const totalLuna = (d) => d.de_facut + d.in_lucru + d.terminat
+  const maxim = Math.max(...date.map(totalLuna), 0)
+  const mx = Math.max(4, Math.ceil(maxim / 4) * 4)
+  const W = 520, H = 230, x0 = 26, yb = 200, yt = 14
+  const bw = (W - x0) / 12
+  const gol = maxim === 0
+
+  return (
+    <section className="min-w-0 rounded-[14px] border border-[#E1E4EA] bg-white p-4 sm:p-5" aria-label={titlu}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-[15px] font-extrabold text-[#172036]">{titlu}</h3>
+        <select value={persoana} onChange={(e) => setPersoana(e.target.value)} aria-label="Filtru angajat"
+          className="max-w-[220px] rounded-lg border border-[#E1E4EA] bg-white px-2 py-1.5 text-sm text-[#172036]">
+          <option value="">Toți angajații</option>
+          {persoane.map((p) => <option key={p.id} value={p.id}>{p.nume}</option>)}
+        </select>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-[#5B6578]">
+        {LUNI_STATUS.map((l) => <span key={l.cod} className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: l.culoare }} />{l.nume}</span>)}
+        <span className="text-[#8A94A6]">· după termen, ultimele 12 luni</span>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="mt-1 w-full" role="img" aria-label={`${titlu}, ultimele 12 luni`}>
+        {[0, 1, 2, 3, 4].map((i) => {
+          const y = yb - ((yb - yt) * i) / 4
+          return (
+            <g key={i}>
+              <line x1={x0} x2={W} y1={y} y2={y} stroke={i ? '#EEF1F6' : '#D5D9E0'} />
+              <text x={x0 - 6} y={y + 4} textAnchor="end" fontSize="10" fill="#5B6578">{Math.round((mx * i) / 4)}</text>
+            </g>
+          )
+        })}
+        {date.map((d, i) => {
+          let y = yb
+          const x = x0 + i * bw + bw * 0.2
+          const tot = totalLuna(d)
+          return (
+            <g key={d.cheie}>
+              {LUNI_STATUS.map((st) => {
+                const v = d[st.cod]
+                if (!v) return null
+                const h = ((yb - yt) * v) / mx
+                y -= h
+                return <rect key={st.cod} x={x} y={y} width={bw * 0.6} height={Math.max(h - 1, 1)} rx="2" fill={st.culoare}><title>{`${LUNI_SCURT[d.luna]} ${d.an}: ${st.nume} ${v}`}</title></rect>
+              })}
+              {tot > 0 && <text x={x0 + i * bw + bw / 2} y={y - 4} textAnchor="middle" fontSize="10" fontWeight="700" fill="#172036">{tot}</text>}
+              <text x={x0 + i * bw + bw / 2} y={yb + 14} textAnchor="middle" fontSize="10" fill="#5B6578">{LUNI_SCURT[d.luna]}</text>
+              {(i === 0 || d.luna === 0) && <text x={x0 + i * bw + bw / 2} y={yb + 26} textAnchor="middle" fontSize="9" fill="#8A94A6">{d.an}</text>}
+            </g>
+          )
+        })}
+      </svg>
+      {gol && <p className="-mt-1 text-center text-xs text-[#5B6578]">Niciun task cu termen în ultimele 12 luni{persoana ? ' pentru persoana aleasă' : ''}.</p>}
+    </section>
   )
 }

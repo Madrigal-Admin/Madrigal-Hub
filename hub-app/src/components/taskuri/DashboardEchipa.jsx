@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { esteIntarziat, estePrelucrat } from '../../lib/taskuri/ui'
-import { BareStivuite, CULORI_STATUS, Casete, Placinta } from './Grafice'
+import { BareStivuite, CULORI_STATUS, Casete, Placinta, TaskuriPeLuni } from './Grafice'
 import { felii } from './DashboardTaskuri'
 
 const LEGENDA = [
@@ -40,6 +40,12 @@ export default function DashboardEchipa({ taskuri, membri, ctx }) {
       .sort((a, b) => (a.nume === 'Fără tag') - (b.nume === 'Fără tag') || b.total - a.total)
   }, [deschise])
 
+  const persoane = useMemo(() => {
+    const ids = new Set(membri)
+    taskuri.forEach((t) => t.responsabil_id && ids.add(t.responsabil_id))
+    return [...ids].map((id) => ({ id, nume: ctx.nume(id) })).sort((a, b) => a.nume.localeCompare(b.nume, 'ro'))
+  }, [taskuri, membri, ctx])
+
   const { status } = useMemo(() => felii(taskuri, ctx), [taskuri, ctx])
   const terminate = taskuri.filter((t) => t.status === 'terminat').length
 
@@ -57,7 +63,10 @@ export default function DashboardEchipa({ taskuri, membri, ctx }) {
         <BareStivuite titlu="Încărcare pe persoană (taskuri deschise)" randuri={peOameni} legenda={LEGENDA} gol="Nu sunt oameni sau taskuri în selecție." />
         <BareStivuite titlu="Încărcare pe subiect (tag)" randuri={peTaguri} legenda={LEGENDA} gol="Nu sunt taskuri deschise." />
       </div>
-      <div className="lg:w-1/2 lg:pr-2"><Placinta titlu="Taskuri pe status" felii={status} gol="Niciun task în selecție." /></div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Placinta titlu="Taskuri pe status" felii={status} gol="Niciun task în selecție." />
+        <TaskuriPeLuni taskuri={taskuri} persoane={persoane} />
+      </div>
     </div>
   )
 }
