@@ -3,13 +3,16 @@ import { supabase } from '../supabaseClient'
 import SiteHeader from './SiteHeader'
 import SiteFooter from './SiteFooter'
 
-export default function Auth() {
+// onStart / onAnuleaza / onIntra: App ține ecranul de autentificare afișat cât timp se creează contul, ca să nu apară
+// „Cont neconfigurat" între conectare și legarea contului de fișa din lista de angajați.
+export default function Auth({ onStart, onAnuleaza, onIntra }) {
   const [tab, setTab] = useState('login') // 'login' | 'signup'
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [info, setInfo] = useState('')
+  const [succes, setSucces] = useState(null) // { nume } după ce contul a fost creat și legat
 
   async function handleLogin(e) {
     e.preventDefault()
@@ -51,7 +54,8 @@ export default function Auth() {
       return
     }
 
-    // 2. Creăm contul de autentificare
+    // 2. Creăm contul de autentificare (în timpul ăsta App nu are voie să schimbe ecranul)
+    onStart?.()
     const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
       email: cleanEmail,
       password,
@@ -59,6 +63,7 @@ export default function Auth() {
 
     if (signUpError) {
       setLoading(false)
+      onAnuleaza?.()
       setError(signUpError.message)
       return
     }
@@ -71,9 +76,62 @@ export default function Auth() {
         .eq('email', cleanEmail)
     }
 
+    // Fără sesiune (dacă proiectul ar cere confirmarea emailului): revenim la formularul de conectare.
+    if (!signUpData?.session) {
+      setLoading(false)
+      onAnuleaza?.()
+      setInfo('Cont creat cu succes! Te poți autentifica acum.')
+      setTab('login')
+      return
+    }
+
+    // 4. Verificăm că legarea a reușit (o singură reîncercare), ca să nu arătăm „succes" degeaba
+    let fisa = null
+    for (let incercare = 0; incercare < 2 && !fisa; incercare++) {
+      if (incercare > 0) await new Promise((r) => setTimeout(r, 1000))
+      const { data } = await supabase
+        .from('angajati')
+        .select('id, nume_complet')
+        .eq('user_id', signUpData.user.id)
+        .maybeSingle()
+      fisa = data
+    }
     setLoading(false)
-    setInfo('Cont creat cu succes! Te poți autentifica acum.')
-    setTab('login')
+    if (!fisa) {
+      await supabase.auth.signOut() // întâi deconectăm (ecranul rămâne cel de autentificare), abia apoi eliberăm App
+      onAnuleaza?.()
+      setError('Contul a fost creat, dar nu s-a putut lega de fișa ta de angajat. Contactează administratorul.')
+      return
+    }
+    setSucces({ nume: fisa.nume_complet || '' })
+  }
+
+  if (succes) {
+    return (
+      <div className="min-h-screen flex flex-col bg-slate-50">
+        <SiteHeader title="Hub Madrigal" subtitle="Autentificare pentru toate tool-urile Madrigal" />
+        <div className="flex-1 flex items-center justify-center px-4 py-10">
+          <div className="w-full max-w-sm bg-white rounded-xl shadow-sm p-6 text-center">
+            <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-green-100 text-green-700">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" /></svg>
+            </div>
+            <h2 className="text-lg font-semibold text-slate-800 mb-1">Cont creat cu succes!</h2>
+            <p className="text-sm text-slate-500 mb-5">
+              {succes.nume ? `Bine ai venit, ${succes.nume}. ` : ''}Contul tău e gata de folosit.
+            </p>
+            <button
+              type="button"
+              autoFocus
+              onClick={() => onIntra?.()}
+              className="w-full bg-accent hover:bg-accent-hover text-white text-sm font-medium py-2.5 rounded-lg transition"
+            >
+              Intră în Hub
+            </button>
+          </div>
+        </div>
+        <SiteFooter />
+      </div>
+    )
   }
 
   return (

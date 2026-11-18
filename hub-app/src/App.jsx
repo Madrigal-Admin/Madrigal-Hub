@@ -15,6 +15,9 @@ export default function App() {
   const [accesTooluri, setAccesTooluri] = useState([])
   const [view, setViewState] = useState(() => new URLSearchParams(window.location.search).get('view') || 'dashboard')
   const [loadingProfil, setLoadingProfil] = useState(true)
+  // Cât timp se creează un cont nou rămâne afișat ecranul de autentificare (vezi Auth.jsx); la final se reîncarcă profilul.
+  const [inregistrare, setInregistrare] = useState(false)
+  const [versiuneProfil, setVersiuneProfil] = useState(0)
 
   // Navigare "reală" — fiecare schimbare de view se scrie în istoricul
   // browserului, ca butonul "Înapoi" să funcționeze intuitiv, nu să te
@@ -66,11 +69,17 @@ export default function App() {
 
     async function loadProfil() {
       setLoadingProfil(true)
-      const { data: angajatData } = await supabase
+      let { data: angajatData } = await supabase
         .from('angajati')
         .select('*')
         .eq('user_id', userId)
         .maybeSingle()
+      if (!angajatData) {
+        // O singură reîncercare: legarea contului de fișa de angajat poate întârzia o fracțiune de secundă.
+        await new Promise((r) => setTimeout(r, 1200))
+        const retry = await supabase.from('angajati').select('*').eq('user_id', userId).maybeSingle()
+        angajatData = retry.data
+      }
 
       setAngajat(angajatData)
 
@@ -86,15 +95,25 @@ export default function App() {
     }
 
     loadProfil()
-  }, [userId])
+  }, [userId, versiuneProfil])
 
   async function handleSignOut() {
     await supabase.auth.signOut()
     navigateTo('dashboard')
   }
 
+  if (inregistrare) {
+    return (
+      <Auth
+        onStart={() => setInregistrare(true)}
+        onAnuleaza={() => setInregistrare(false)}
+        onIntra={() => { setLoadingProfil(true); setVersiuneProfil((v) => v + 1); setInregistrare(false) }}
+      />
+    )
+  }
+
   // Încă verificăm dacă există o sesiune salvată
-  if (session === undefined || loadingProfil) {
+  if (session === undefined) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <p className="text-slate-400 text-sm">Se încarcă...</p>
@@ -103,7 +122,21 @@ export default function App() {
   }
 
   if (!session) {
-    return <Auth />
+    return (
+      <Auth
+        onStart={() => setInregistrare(true)}
+        onAnuleaza={() => setInregistrare(false)}
+        onIntra={() => { setLoadingProfil(true); setVersiuneProfil((v) => v + 1); setInregistrare(false) }}
+      />
+    )
+  }
+
+  if (loadingProfil) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <p className="text-slate-400 text-sm">Se încarcă...</p>
+      </div>
+    )
   }
 
   if (!angajat) {
@@ -112,8 +145,8 @@ export default function App() {
         <div className="text-center max-w-sm">
           <p className="text-slate-800 font-medium mb-2">Cont neconfigurat</p>
           <p className="text-sm text-slate-500 mb-4">
-            Contul tău e autentificat, dar nu e legat de niciun rând din lista de angajați.
-            Contactează adminul.
+            Contul tău nu este încă asociat unei fișe de angajat. Contactează administratorul
+            și spune-i adresa de email folosită.
           </p>
           <button
             onClick={handleSignOut}
