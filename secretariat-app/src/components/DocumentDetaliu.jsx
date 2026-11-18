@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { ArrowLeft, FileOutput, Lock, Pencil, Send } from 'lucide-react'
+import { FileOutput, Lock, Pencil, Send } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { ETICHETE_CAMPURI, MOD_SEMNARE, ORDINE_SEMNARE, REGISTRE, STATUSURI, esteStaff, veziTot } from '../lib/roluri'
 import { formatData, formatDataOra, mesajEroare } from '../lib/util'
@@ -61,7 +61,8 @@ function textTermen(zile) {
   return `depășit cu ${-zile} zile`
 }
 
-export default function DocumentDetaliu({ id, role, comune, onInapoi, onEdit, onDeschide, onNou }) {
+// Conținutul ferestrei unice a unui document (se afișează în Fereastra din Registru.jsx)
+export default function DocumentDetaliu({ id, role, comune, onInchide, onIncarcat, onEdit, onDeschide, onNou }) {
   const [doc, setDoc] = useState(undefined) // undefined = se încarcă, null = nu există / fără acces
   const [fisiere, setFisiere] = useState([])
   const [jurnal, setJurnal] = useState(null)
@@ -74,6 +75,7 @@ export default function DocumentDetaliu({ id, role, comune, onInapoi, onEdit, on
   const incarca = useCallback(async () => {
     const { data: d } = await supabase.from('sec_documente_lista').select('*').eq('id', id).maybeSingle()
     setDoc(d || null)
+    onIncarcat?.(d || null)
     if (!d) return
     const cereri = [
       supabase.from('sec_fisiere').select('*').eq('document_id', id).order('versiune', { ascending: false }),
@@ -102,7 +104,7 @@ export default function DocumentDetaliu({ id, role, comune, onInapoi, onEdit, on
     } else {
       setLegat(null)
     }
-  }, [id, role])
+  }, [id, role]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     incarca()
@@ -112,16 +114,14 @@ export default function DocumentDetaliu({ id, role, comune, onInapoi, onEdit, on
   if (doc === null) {
     return (
       <div className="space-y-4">
-        <button className={btnGhost} onClick={onInapoi}><ArrowLeft size={14} /> Înapoi la registru</button>
         <Eroare>Documentul nu există sau nu ai acces la el.</Eroare>
+        <button className={btnGhost} onClick={onInchide}>Închide</button>
       </div>
     )
   }
   if (doc.status === 'liber') {
     return (
       <div className="space-y-4">
-        <button className={btnGhost} onClick={onInapoi}><ArrowLeft size={14} /> Înapoi la registru</button>
-        <h2 className="text-[28px] font-extrabold tracking-tight text-slate-900">{doc.numar_afisat}</h2>
         <Info>Acesta este un loc liber, rezervat la {formatData(doc.data_inreg)}. Nu conține încă niciun document.</Info>
         {esteStaff(role) && <button className={btnPrimary} onClick={() => onEdit(doc)}><Pencil size={14} /> Completează</button>}
       </div>
@@ -130,12 +130,12 @@ export default function DocumentDetaliu({ id, role, comune, onInapoi, onEdit, on
   return (
     <Pagina
       doc={doc} fisiere={fisiere} jurnal={jurnal} legat={legat} legaturi={legaturi} iesiriCircuit={iesiriCircuit} circuitSursa={circuitSursa} acces={acces}
-      role={role} comune={comune} incarca={incarca} onInapoi={onInapoi} onEdit={onEdit} onDeschide={onDeschide} onNou={onNou}
+      role={role} comune={comune} incarca={incarca} onInchide={onInchide} onEdit={onEdit} onDeschide={onDeschide} onNou={onNou}
     />
   )
 }
 
-function Pagina({ doc, fisiere, jurnal, legat, legaturi, iesiriCircuit, circuitSursa, acces, role, comune, incarca, onInapoi, onEdit, onDeschide, onNou }) {
+function Pagina({ doc, fisiere, jurnal, legat, legaturi, iesiriCircuit, circuitSursa, acces, role, comune, incarca, onInchide, onEdit, onDeschide, onNou }) {
   const [eroare, setEroare] = useState('')
   const [mesaj, setMesaj] = useState('')
   const [busy, setBusy] = useState(false)
@@ -242,11 +242,7 @@ function Pagina({ doc, fisiere, jurnal, legat, legaturi, iesiriCircuit, circuitS
     <div className="flex flex-wrap items-start gap-8">
       <div className="min-w-0 flex-[999_1_30rem] space-y-6">
         <div>
-          <button className="text-[13px] text-slate-500 hover:underline focus-ring" onClick={onInapoi}>
-            <ArrowLeft size={13} className="mr-1 inline" aria-hidden="true" />Înapoi la {info.label.toLowerCase()}
-          </button>
-          <div className="mt-2 flex flex-wrap items-center gap-3">
-            <h2 className="text-[28px] font-extrabold tracking-tight text-slate-900">{doc.numar_afisat}</h2>
+          <div className="flex flex-wrap items-center gap-3">
             {circuit && <ModSemnareBadge mod={doc.mod_semnare} />}
             {doc.confidential && (
               <span className="inline-flex items-center gap-1 rounded-full bg-slate-800 px-2.5 py-0.5 text-xs font-medium text-white">
@@ -481,7 +477,7 @@ function Pagina({ doc, fisiere, jurnal, legat, legaturi, iesiriCircuit, circuitS
             {staff && doc.status !== 'anulat' && (
               <button className="text-sm font-semibold text-rose-700 hover:underline focus-ring" onClick={() => setAnuleaza(true)}>Anulează documentul…</button>
             )}
-            {role === 'admin' && <StergereDocument doc={doc} onSters={onInapoi} />}
+            {role === 'admin' && <StergereDocument doc={doc} onSters={onInchide} />}
           </div>
           {anuleaza && (
             <CasetaMotiv

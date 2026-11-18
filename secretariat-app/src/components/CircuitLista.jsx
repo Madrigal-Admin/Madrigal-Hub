@@ -41,7 +41,7 @@ export default function CircuitLista({ role, comune, filtre, setFiltre, versiune
     const t = f.q.replace(/[,()*%\\:]/g, ' ').trim()
     if (t) query = query.or(`numar_afisat.ilike.%${t}%,obiect.ilike.%${t}%`)
     const de = (f.pagina - 1) * PE_PAGINA
-    const { data, count, error } = await query.order('nr', { ascending: false }).range(de, de + PE_PAGINA - 1)
+    const { data, count, error } = await query.order('data_inreg', { ascending: false }).order('created_at', { ascending: false }).range(de, de + PE_PAGINA - 1)
     if (error) setEroare(mesajEroare(error))
     setRows(data || [])
     setTotal(count || 0)
