@@ -1,5 +1,5 @@
 import { supabase } from '../../supabaseClient'
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { incarcaTaskuri } from '../../lib/taskuri/date'
 import { construiesteCtx } from '../../lib/taskuri/drepturi'
 import TaskDetaliu from './TaskDetaliu'
@@ -26,6 +26,35 @@ export function TaskuriProvider({ angajat, accesTooluri, children }) {
     }
   }, [])
   useEffect(() => { reload() }, [reload])
+
+  // Sincronizare automată ușoară: o dată pe minut (cât fila e vizibilă) și când revii pe filă, verificăm doar lista
+  // mea de notificări (tsk_necitite, foarte mică). Dacă s-a schimbat (task nou atribuit, mențiune, actualizare), reîncărcăm datele.
+  const necititeRef = useRef(null)
+  useEffect(() => { necititeRef.current = date ? date.necitite : null }, [date])
+  useEffect(() => {
+    const semn = (obiect) => Object.entries(obiect).map(([k, v]) => `${k}:${v}`).sort().join('|')
+    let ocupat = false
+    const verifica = async () => {
+      if (ocupat || document.visibilityState !== 'visible' || !necititeRef.current) return
+      ocupat = true
+      try {
+        const { data, error } = await supabase.from('tsk_necitite').select('task_id, motiv')
+        if (error || !data) return
+        const acum = Object.fromEntries(data.map((r) => [r.task_id, r.motiv]))
+        if (semn(acum) !== semn(necititeRef.current)) await reload()
+      } finally {
+        ocupat = false
+      }
+    }
+    const timer = setInterval(verifica, 60000)
+    document.addEventListener('visibilitychange', verifica)
+    window.addEventListener('focus', verifica)
+    return () => {
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', verifica)
+      window.removeEventListener('focus', verifica)
+    }
+  }, [reload])
 
   // Deschiderea unui task citește eticheta Nou: o scoatem din listă imediat și din baza de date.
   const marcheazaCitit = useCallback(

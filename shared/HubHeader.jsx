@@ -129,25 +129,28 @@ function useModCompact(tooluri, activ) {
   const lista = useRef(null)
   const [mod, setMod] = useState(0)
   const [lat, setLat] = useState(0)
+  const [deruleaza, setDeruleaza] = useState(false)
   useEffect(() => {
     if (!nav.current || typeof ResizeObserver === 'undefined') return
     const ro = new ResizeObserver((e) => {
       const w = Math.round(e[0].contentRect.width)
-      setLat((v) => { if (v !== w) setMod(0); return w })
+      setLat((v) => { if (v !== w) { setMod(0); setDeruleaza(false) } return w })
     })
     ro.observe(nav.current)
     return () => ro.disconnect()
   }, [])
   useLayoutEffect(() => {
     const el = lista.current
-    if (el && mod < 2 && el.scrollWidth > el.clientWidth + 1) setMod(mod + 1)
+    if (!el || el.scrollWidth <= el.clientWidth + 1) return
+    if (mod < 2) setMod(mod + 1)
+    else setDeruleaza(true) // plasă de siguranță: dacă nici iconițele nu încap (foarte multe tool-uri), se derulează
   }, [mod, lat, tooluri, activ])
-  useEffect(() => { setMod(0) }, [tooluri, activ])
-  return { nav, lista, mod }
+  useEffect(() => { setMod(0); setDeruleaza(false) }, [tooluri, activ])
+  return { nav, lista, mod, deruleaza }
 }
 
 export default function HubHeader({ nume, tooluri, activ, onNavigate, onGhid, onSignOut }) {
-  const { nav, lista, mod } = useModCompact(tooluri, activ)
+  const { nav, lista, mod, deruleaza } = useModCompact(tooluri, activ)
   const acasa = { href: '/', view: 'dashboard', curent: activ === 'acasa' }
   return (
     <>
@@ -173,13 +176,17 @@ export default function HubHeader({ nume, tooluri, activ, onNavigate, onGhid, on
           </div>
           {/* centrat prin margini automate: dacă nu încape, începe de la margine și se derulează */}
           <div className="flex min-w-0">
-            <ul ref={lista} className="m-0 mx-auto flex max-w-full list-none items-center gap-1.5 overflow-x-auto p-0.5 [scrollbar-width:thin]">
+            <ul ref={lista} className={`m-0 mx-auto flex max-w-full list-none items-center ${mod === 2 ? 'gap-1' : 'gap-1.5'} p-0.5 [scrollbar-width:thin] ${deruleaza ? 'overflow-x-auto' : ''}`}>
               {tooluri.map((t) => {
                 const aprins = t.key === activ
+                const cuNume = mod === 0 || (mod === 1 && aprins)
+                // Doar iconiță: la trecerea cu mouse-ul (sau cu tastatura) se extinde peste vecini și arată numele, fără să mute restul barei.
+                const extinde = 'w-10 justify-center hover:absolute hover:left-0 hover:top-0 hover:z-30 hover:w-auto hover:justify-start hover:px-3 hover:shadow-md hover:ring-1 hover:ring-[#E1E4EA] focus-visible:absolute focus-visible:left-0 focus-visible:top-0 focus-visible:z-30 focus-visible:w-auto focus-visible:justify-start focus-visible:px-3 focus-visible:shadow-md'
                 return (
-                  <li key={t.key} className="shrink-0">
-                    <Legatura item={{ ...t, curent: aprins }} onNavigate={onNavigate} titlu={t.label} className={`inline-flex h-11 items-center gap-2 whitespace-nowrap rounded-full text-sm no-underline ${mod === 0 ? 'px-4' : mod === 1 ? 'px-3' : 'px-2.5'} ${aprins ? 'bg-[#DCE6F5] font-extrabold text-[#22406B]' : 'font-semibold text-[#3A465C] hover:bg-[#EEF1F6]'} ${FOCUS}`}>
-                      <Icon name={t.icon} strokeWidth={aprins ? 2.1 : 1.8} /> {(mod === 0 || (mod === 1 && aprins)) && <span>{t.label}</span>}
+                  <li key={t.key} className={`shrink-0 ${cuNume ? '' : 'group relative h-11 w-10'}`}>
+                    <Legatura item={{ ...t, curent: aprins }} onNavigate={onNavigate} titlu={t.label} className={`inline-flex h-11 items-center gap-2 whitespace-nowrap rounded-full text-sm no-underline ${cuNume ? (mod === 0 ? 'px-4' : 'px-3') : extinde} ${aprins ? 'bg-[#DCE6F5] font-extrabold text-[#22406B]' : 'font-semibold text-[#3A465C] hover:bg-[#EEF1F6]'} ${FOCUS}`}>
+                      <Icon name={t.icon} strokeWidth={aprins ? 2.1 : 1.8} />
+                      {cuNume ? <span>{t.label}</span> : <span className="hidden group-hover:inline group-focus-within:inline">{t.label}</span>}
                     </Legatura>
                   </li>
                 )
