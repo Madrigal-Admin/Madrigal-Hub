@@ -9,6 +9,8 @@ import { AngajatiMulti } from './Pickere'
 import Fisiere from './Fisiere'
 import { CircuitLocatie, CircuitSemnatari, useCircuit } from './CircuitSectiune'
 import StergereDocument from './StergereDocument'
+import DocumentForm from './DocumentForm'
+import CircuitForm from './CircuitForm'
 
 const PASI_FLUX = {
   intrari: ['inregistrat', 'repartizat', 'in_lucru', 'solutionat'],
@@ -62,7 +64,7 @@ function textTermen(zile) {
 }
 
 // Conținutul ferestrei unice a unui document (se afișează în Fereastra din Registru.jsx)
-export default function DocumentDetaliu({ id, role, comune, onInchide, onIncarcat, onEdit, onDeschide, onNou }) {
+export default function DocumentDetaliu({ id, role, comune, editare, onEditare, onSalvat, onInchide, onIncarcat, onDeschide, onNou }) {
   const [doc, setDoc] = useState(undefined) // undefined = se încarcă, null = nu există / fără acces
   const [fisiere, setFisiere] = useState([])
   const [jurnal, setJurnal] = useState(null)
@@ -122,20 +124,29 @@ export default function DocumentDetaliu({ id, role, comune, onInchide, onIncarca
   if (doc.status === 'liber') {
     return (
       <div className="space-y-4">
-        <Info>Acesta este un loc liber, rezervat la {formatData(doc.data_inreg)}. Nu conține încă niciun document.</Info>
-        {esteStaff(role) && <button className={btnPrimary} onClick={() => onEdit(doc)}><Pencil size={14} /> Completează</button>}
+        {esteStaff(role) ? (
+          <FormularDocument doc={doc} role={role} comune={comune} onSalvat={onSalvat} onRenunta={onInchide} />
+        ) : (
+          <Info>Acesta este un loc liber, rezervat la {formatData(doc.data_inreg)}. Nu conține încă niciun document.</Info>
+        )}
       </div>
     )
   }
   return (
     <Pagina
       doc={doc} fisiere={fisiere} jurnal={jurnal} legat={legat} legaturi={legaturi} iesiriCircuit={iesiriCircuit} circuitSursa={circuitSursa} acces={acces}
-      role={role} comune={comune} incarca={incarca} onInchide={onInchide} onEdit={onEdit} onDeschide={onDeschide} onNou={onNou}
+      role={role} comune={comune} incarca={incarca} editare={editare} onEditare={onEditare} onSalvat={onSalvat} onInchide={onInchide} onDeschide={onDeschide} onNou={onNou}
     />
   )
 }
 
-function Pagina({ doc, fisiere, jurnal, legat, legaturi, iesiriCircuit, circuitSursa, acces, role, comune, incarca, onInchide, onEdit, onDeschide, onNou }) {
+// Formularul documentului, afișat chiar în fereastra documentului (modificare sau completarea unui loc liber)
+function FormularDocument({ doc, role, comune, onSalvat, onRenunta }) {
+  const Formular = doc.registru === 'circuit' ? CircuitForm : DocumentForm
+  return <Formular registru={doc.registru} doc={doc} prefill={null} serieImplicita="" role={role} comune={comune} onSalvat={onSalvat} onRenunta={onRenunta} />
+}
+
+function Pagina({ doc, fisiere, jurnal, legat, legaturi, iesiriCircuit, circuitSursa, acces, role, comune, incarca, editare, onEditare, onSalvat, onInchide, onDeschide, onNou }) {
   const [eroare, setEroare] = useState('')
   const [mesaj, setMesaj] = useState('')
   const [busy, setBusy] = useState(false)
@@ -172,6 +183,8 @@ function Pagina({ doc, fisiere, jurnal, legat, legaturi, iesiriCircuit, circuitS
   const intrare = doc.registru === 'intrari'
   const iesire = doc.registru === 'iesiri'
   const activ = !['anulat', 'arhivat'].includes(doc.status)
+  const poateModifica = staff && activ && (!circuit || doc.status === 'ciorna')
+  const seModifica = editare && poateModifica
   const numeAng = (aid) => comune.angajati.find((a) => a.id === aid)?.nume_complet
   const numeGrup = (gid) => comune.grupuri.find((g) => g.id === gid)?.nume
   const resp = [numeAng(doc.resp_angajat_id), numeGrup(doc.resp_grup_id)].filter(Boolean).join(' · ')
@@ -259,8 +272,8 @@ function Pagina({ doc, fisiere, jurnal, legat, legaturi, iesiriCircuit, circuitS
               {staff && circuit && ['in_circuit', 'semnat'].includes(doc.status) && (
                 <button className={btnPrimary} disabled={doc.status !== 'semnat'} onClick={creazaIesire}><FileOutput size={14} /> Înregistrează în Ieșiri</button>
               )}
-              {staff && activ && (!circuit || doc.status === 'ciorna') && (
-                <button className={btnGhost} onClick={() => onEdit(doc)}><Pencil size={14} /> Modifică</button>
+              {poateModifica && !seModifica && (
+                <button className={btnGhost} onClick={() => onEditare(true)}><Pencil size={14} /> Modifică</button>
               )}
             </div>
           </div>
@@ -277,38 +290,42 @@ function Pagina({ doc, fisiere, jurnal, legat, legaturi, iesiriCircuit, circuitS
         <Eroare>{eroare}</Eroare>
         {mesaj && <Info>{mesaj}</Info>}
 
-        <div>
-          <p className="whitespace-pre-wrap text-xl font-bold text-slate-900">{doc.obiect}</p>
-          <dl className="mt-4 border-t border-slate-100">
-            {circuit && legat && (
-              <Rand eticheta="Legat de">
-                {legat.id ? (
-                  <button className="font-bold text-accent hover:underline" onClick={() => onDeschide(legat.registru, legat.id)}>{legat.numar_afisat}</button>
-                ) : <span className="text-slate-500">{legat.numar_afisat}</span>}
-                {legat.obiect && <span className="text-slate-500"> · {legat.obiect}</span>}
-              </Rand>
-            )}
-            {intrare && circuitActiv && (
-              <Rand eticheta="Circuit de semnare">
-                <button className="font-bold text-accent hover:underline focus-ring" onClick={() => onDeschide('circuit', circuitActiv.id)}>{circuitActiv.numar_afisat}</button>
-                <span className="ml-2 align-middle"><StareBadge stare={circuitActiv.status} /></span>
-                <span className="ml-2 text-xs text-slate-500">Un singur circuit pe document.</span>
-              </Rand>
-            )}
-            {!circuit && <Rand eticheta={info.contact}>{doc.contact_denumire}</Rand>}
-            {intrare && <Rand eticheta="Document primit">{[doc.nr_document_extern, doc.data_document && `din ${formatData(doc.data_document)}`].filter(Boolean).join(' ')}</Rand>}
-            {!circuit && <Rand eticheta={info.canal}>{doc.canal_denumire}</Rand>}
-            <Rand eticheta="Tip document">{doc.tip_denumire}</Rand>
-            <Rand eticheta={info.resp}>{resp}</Rand>
-            {iesire && <Rand eticheta="Semnatar">{numeAng(doc.semnatar_id)}</Rand>}
-            <Rand eticheta="Mod de semnare">{MOD_SEMNARE[doc.mod_semnare]}</Rand>
-            {circuit && <Rand eticheta="Ordine">{ORDINE_SEMNARE[doc.ordine_semnare]}</Rand>}
-            <Rand eticheta="Serie">{doc.serie_cod} — {doc.serie_denumire}</Rand>
-            <Rand eticheta="Înregistrat">{[formatData(doc.data_inreg), numeAng(doc.creat_de) && `de ${numeAng(doc.creat_de)}`].filter(Boolean).join(', ')}</Rand>
-          </dl>
-        </div>
+        {seModifica ? (
+          <FormularDocument doc={doc} role={role} comune={comune} onSalvat={onSalvat} onRenunta={() => onEditare(false)} />
+        ) : (
+          <div>
+            <p className="whitespace-pre-wrap text-xl font-bold text-slate-900">{doc.obiect}</p>
+            <dl className="mt-4 border-t border-slate-100">
+              {circuit && legat && (
+                <Rand eticheta="Legat de">
+                  {legat.id ? (
+                    <button className="font-bold text-accent hover:underline" onClick={() => onDeschide(legat.registru, legat.id)}>{legat.numar_afisat}</button>
+                  ) : <span className="text-slate-500">{legat.numar_afisat}</span>}
+                  {legat.obiect && <span className="text-slate-500"> · {legat.obiect}</span>}
+                </Rand>
+              )}
+              {intrare && circuitActiv && (
+                <Rand eticheta="Circuit de semnare">
+                  <button className="font-bold text-accent hover:underline focus-ring" onClick={() => onDeschide('circuit', circuitActiv.id)}>{circuitActiv.numar_afisat}</button>
+                  <span className="ml-2 align-middle"><StareBadge stare={circuitActiv.status} /></span>
+                  <span className="ml-2 text-xs text-slate-500">Un singur circuit pe document.</span>
+                </Rand>
+              )}
+              {!circuit && <Rand eticheta={info.contact}>{doc.contact_denumire}</Rand>}
+              {intrare && <Rand eticheta="Document primit">{[doc.nr_document_extern, doc.data_document && `din ${formatData(doc.data_document)}`].filter(Boolean).join(' ')}</Rand>}
+              {!circuit && <Rand eticheta={info.canal}>{doc.canal_denumire}</Rand>}
+              <Rand eticheta="Tip document">{doc.tip_denumire}</Rand>
+              <Rand eticheta={info.resp}>{resp}</Rand>
+              {iesire && <Rand eticheta="Semnatar">{numeAng(doc.semnatar_id)}</Rand>}
+              <Rand eticheta="Mod de semnare">{MOD_SEMNARE[doc.mod_semnare]}</Rand>
+              {circuit && <Rand eticheta="Ordine">{ORDINE_SEMNARE[doc.ordine_semnare]}</Rand>}
+              <Rand eticheta="Serie">{doc.serie_cod} — {doc.serie_denumire}</Rand>
+              <Rand eticheta="Înregistrat">{[formatData(doc.data_inreg), numeAng(doc.creat_de) && `de ${numeAng(doc.creat_de)}`].filter(Boolean).join(', ')}</Rand>
+            </dl>
+          </div>
+        )}
 
-        {circuit && <CircuitSemnatari c={c} />}
+        {circuit && !seModifica && <CircuitSemnatari c={c} />}
 
         <Fisiere doc={doc} fisiere={fisiere} poateIncarca={staff} comune={comune} reload={incarca} />
 

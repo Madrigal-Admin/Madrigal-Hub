@@ -45,15 +45,6 @@ export function Info({ children }) {
   return <p className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-800">{children}</p>
 }
 
-export function Valoare({ eticheta, children }) {
-  return (
-    <div>
-      <p className="text-xs font-medium text-slate-500">{eticheta}</p>
-      <div className="mt-0.5 text-sm text-slate-800">{children || <span className="text-slate-400">—</span>}</div>
-    </div>
-  )
-}
-
 // Casetă pentru acțiuni care cer un motiv (anulare)
 export function CasetaMotiv({ titlu, eticheta = 'Motiv', onConfirma, onRenunta, busy }) {
   const [motiv, setMotiv] = useState('')

@@ -10,9 +10,9 @@ import { REGISTRE } from '../lib/roluri'
 
 // Un registru are un singur ecran (lista). Orice document se deschide într-o singură fereastră (pop-up) care are trei moduri:
 //   vezi  = toate detaliile documentului (stare, rezoluție, fișiere, legături, jurnal, acțiuni)
-//   edit  = modificarea sau completarea documentului (același formular ca la adăugare)
 //   nou   = adăugarea unui document
-// Starea ferestrei: { mod, id, doc, prefill, serieImplicita, dinVedere }
+// În modul vezi, `editare` face ca aceleași câmpuri ale documentului să devină editabile pe loc (în aceeași fereastră).
+// Starea ferestrei: { mod, id, editare, prefill, serieImplicita }
 export default function Registru({ registru, params, role, comune, go }) {
   const [fereastra, setFereastra] = useState(() => {
     if (params?.id) return { mod: 'vezi', id: params.id }
@@ -27,27 +27,31 @@ export default function Registru({ registru, params, role, comune, go }) {
 
   const info = REGISTRE[registru]
   const reincarca = () => setVersiune((v) => v + 1)
-  const deschide = (id) => { setAnunt(null); setTitluVezi(''); setFereastra({ mod: 'vezi', id }) }
+  const deschide = (id, editare = false) => { setAnunt(null); setTitluVezi(''); setFereastra({ mod: 'vezi', id, editare }) }
   const inchide = () => { setFereastra(null); reincarca() }
 
+  // Salvarea din fereastra unui document (modificare sau completarea unui loc liber): fereastra rămâne deschisă, pe document
+  function dupaModificare(id) {
+    setFereastra({ mod: 'vezi', id, editare: false })
+    reincarca()
+  }
+  // Salvarea unui document nou
   function dupaSalvare(id, rezultat) {
     const f = fereastra
-    // Adăugare din „Trimite la semnare” / „Înregistrează în Ieșiri” sau modificare făcută din fereastra documentului: se revine la document
-    if (f?.mod === 'nou' ? f.prefill : f?.dinVedere) {
+    // Adăugare din „Trimite la semnare” / „Înregistrează în Ieșiri”: se deschide documentul nou
+    if (f?.prefill) {
       deschide(id)
       reincarca()
       return
     }
     setFereastra(null)
-    const completare = f?.doc?.status === 'liber'
-    const numar = rezultat?.nr ? numarDin(registru, { ...rezultat, serie_id: rezultat.serie_id || f?.doc?.serie_id }, comune.serii) : ''
-    setAnunt({ id, text: f?.doc ? `Salvat: ${f.doc.numar_afisat}.` : numar ? `Înregistrat: ${numar}.` : 'Documentul a fost înregistrat.', completare })
+    const numar = rezultat?.nr ? numarDin(registru, rezultat, comune.serii) : ''
+    setAnunt({ id, text: numar ? `Înregistrat: ${numar}.` : 'Documentul a fost înregistrat.' })
     reincarca()
   }
 
   const Lista = registru === 'circuit' ? CircuitLista : RegistruLista
   const Formular = registru === 'circuit' ? CircuitForm : DocumentForm
-  const doc = fereastra?.doc || null
 
   let titlu = ''
   let subtitlu
@@ -55,8 +59,6 @@ export default function Registru({ registru, params, role, comune, go }) {
   if (fereastra?.mod === 'vezi') {
     titlu = titluVezi || 'Se încarcă…'
     latime = 'max-w-6xl'
-  } else if (fereastra?.mod === 'edit') {
-    titlu = doc?.status === 'liber' ? `Completează ${doc.numar_afisat}` : `Modificare ${doc?.numar_afisat || ''}`
   } else if (fereastra?.mod === 'nou') {
     titlu = info.nou
     subtitlu = 'Numărul se acordă automat la salvare. Dacă renunți, nu se pierde niciun număr.'
@@ -81,7 +83,7 @@ export default function Registru({ registru, params, role, comune, go }) {
           versiune={versiune}
           onDeschide={deschide}
           onNou={(serieImplicita) => { setAnunt(null); setFereastra({ mod: 'nou', serieImplicita }) }}
-          onEdit={(d) => { setAnunt(null); setFereastra({ mod: 'edit', id: d.id, doc: d, dinVedere: false }) }}
+          onEdit={(d) => deschide(d.id, true)}
           onLiber={(text) => { setAnunt({ id: null, text }); reincarca() }}
         />
       </div>
@@ -96,20 +98,22 @@ export default function Registru({ registru, params, role, comune, go }) {
               comune={comune}
               onInchide={inchide}
               onIncarcat={(d) => setTitluVezi(d ? d.numar_afisat : 'Document')}
-              onEdit={(d) => setFereastra({ mod: 'edit', id: d.id, doc: d, dinVedere: true })}
+              editare={!!fereastra.editare}
+              onEditare={(e) => setFereastra({ ...fereastra, editare: e })}
+              onSalvat={dupaModificare}
               onDeschide={(reg, id) => (reg === registru ? deschide(id) : go(reg, { id }))}
               onNou={(reg, nou) => go(reg, { nou: { ...nou, ts: Date.now() } })}
             />
           ) : (
             <Formular
               registru={registru}
-              doc={doc}
+              doc={null}
               prefill={fereastra.prefill || null}
               serieImplicita={fereastra.serieImplicita || ''}
               role={role}
               comune={comune}
               onSalvat={dupaSalvare}
-              onRenunta={() => (fereastra.dinVedere ? deschide(fereastra.id) : setFereastra(null))}
+              onRenunta={() => setFereastra(null)}
             />
           )}
         </Fereastra>
