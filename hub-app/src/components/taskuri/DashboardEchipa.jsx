@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { esteIntarziat, estePrelucrat } from '../../lib/taskuri/ui'
 import { BareStivuite, CULORI_STATUS, Casete, Placinta, TaskuriPeLuni } from './Grafice'
 import { felii } from './DashboardTaskuri'
@@ -13,7 +13,9 @@ const segmente = (lista) => [
 ]
 
 // Dashboardul coordonatorului: cine are ce de făcut, pe ce subiecte (taguri) și în ce stare.
-export default function DashboardEchipa({ taskuri, membri, ctx }) {
+export default function DashboardEchipa({ taskuri, membri, afara = {}, ctx }) {
+  const [arataRestul, setArataRestul] = useState(true)
+  const existaAfara = Object.values(afara).some((n) => n > 0)
   const deschise = useMemo(() => taskuri.filter(estePrelucrat), [taskuri])
 
   const peOameni = useMemo(() => {
@@ -22,12 +24,12 @@ export default function DashboardEchipa({ taskuri, membri, ctx }) {
     const randuri = [...ids].map((id) => {
       const lista = deschise.filter((t) => t.responsabil_id === id)
       const intarz = lista.filter(esteIntarziat).length
-      return { nume: ctx.nume(id), segmente: segmente(lista), eticheta: intarz ? `${intarz} înt.` : '', total: lista.length }
+      return { nume: ctx.nume(id), segmente: segmente(lista), eticheta: intarz ? `${intarz} înt.` : '', total: lista.length, afara: arataRestul ? afara[id] || 0 : 0 }
     })
     const fara = deschise.filter((t) => !t.responsabil_id)
     if (fara.length) randuri.push({ nume: 'Fără responsabil', segmente: segmente(fara), eticheta: '', total: fara.length })
     return randuri.sort((a, b) => b.total - a.total || a.nume.localeCompare(b.nume, 'ro'))
-  }, [deschise, membri, ctx])
+  }, [deschise, membri, ctx, afara, arataRestul])
 
   const peTaguri = useMemo(() => {
     const m = new Map()
@@ -59,6 +61,12 @@ export default function DashboardEchipa({ taskuri, membri, ctx }) {
           ['Terminate', terminate, 'text-[#1E6B43]'],
         ]}
       />
+      {existaAfara && (
+        <label className="flex min-h-[44px] w-fit cursor-pointer items-center gap-2 text-sm font-semibold text-[#5B6578]">
+          <input type="checkbox" checked={arataRestul} onChange={(e) => setArataRestul(e.target.checked)} className="h-4 w-4" />
+          Arată și restul taskurilor membrilor
+        </label>
+      )}
       <div className="grid gap-4 lg:grid-cols-2">
         <BareStivuite titlu="Încărcare pe persoană (taskuri deschise)" randuri={peOameni} legenda={LEGENDA} gol="Nu sunt oameni sau taskuri în selecție." />
         <BareStivuite titlu="Încărcare pe subiect (tag)" randuri={peTaguri} legenda={LEGENDA} gol="Nu sunt taskuri deschise." />

@@ -37,7 +37,14 @@ export async function incarcaTaskuri() {
       // Nou pentru tine: RLS întoarce doar rândurile mele. Dacă migrarea 20 nu e rulată încă, lista rămâne goală.
       supabase.from('tsk_necitite').select('task_id, motiv').then((r) => r.data || []),
     ])
+  // Cifre (fără titluri): taskurile deschise ale membrilor mei din AFARA departamentului. Dacă migrarea 24 nu e rulată, lista rămâne goală.
+  let inAfara = {}
+  try {
+    const r = await supabase.rpc('tsk_numar_in_afara')
+    if (!r.error && r.data) inAfara = Object.fromEntries(r.data.map((x) => [`${x.grup_id}:${x.angajat_id}`, x.nr]))
+  } catch { /* migrarea 24 încă nerulată */ }
   return {
+    inAfara,
     categorii,
     sabloane,
     angajati,

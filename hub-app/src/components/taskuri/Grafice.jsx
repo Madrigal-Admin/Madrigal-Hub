@@ -88,7 +88,7 @@ export function ProgresPeTag({ titlu, randuri, gol = 'Niciun task cu tag.' }) {
 
 // Bare orizontale stivuite: randuri = [{ nume, segmente: [{ cheie, valoare, culoare }], eticheta }]
 export function BareStivuite({ titlu, randuri, legenda = [], gol = 'Nu sunt date.' }) {
-  const max = Math.max(1, ...randuri.map((r) => r.segmente.reduce((s, x) => s + x.valoare, 0)))
+  const max = Math.max(1, ...randuri.map((r) => r.segmente.reduce((s, x) => s + x.valoare, 0) + (r.afara || 0)))
   return (
     <section className="min-w-0 rounded-[14px] border border-[#E1E4EA] bg-white p-4 sm:p-5" aria-label={titlu}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
@@ -112,8 +112,9 @@ export function BareStivuite({ titlu, randuri, legenda = [], gol = 'Nu sunt date
                   {r.segmente.filter((x) => x.valoare > 0).map((x) => (
                     <div key={x.cheie} title={`${x.cheie}: ${x.valoare}`} style={{ width: `${(x.valoare / max) * 100}%`, backgroundColor: x.culoare }} />
                   ))}
+                  {r.afara > 0 && <div title={`+${r.afara} în afara departamentului`} style={{ width: `${(r.afara / max) * 100}%`, background: 'repeating-linear-gradient(45deg, #C9D1DF 0 4px, #E9EDF3 4px 8px)' }} />}
                 </div>
-                <span className="w-16 shrink-0 text-right text-[13px] text-[#5B6578]">{total}{r.eticheta ? <b className="ml-1 text-[#B4332E]">{r.eticheta}</b> : null}</span>
+                <span className="w-24 shrink-0 text-right text-[13px] text-[#5B6578]">{total}{r.afara > 0 ? <span className="ml-1">+{r.afara}</span> : null}{r.eticheta ? <b className="ml-1 text-[#B4332E]">{r.eticheta}</b> : null}</span>
               </li>
             )
           })}

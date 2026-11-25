@@ -10,9 +10,6 @@ export function construiesteCtx(date, me, rol) {
   const statusMap = Object.fromEntries(date.statusuri.map((s) => [s.cod, s]))
 
   const grupuriCoordonate = new Set(date.membri.filter((m) => m.angajat_id === me.id && m.e_coordonator).map((m) => m.grup_id))
-  const membriGrup = (gid) => date.membri.filter((m) => m.grup_id === gid).map((m) => m.angajat_id)
-  const oamenii = new Set() // oamenii din departamentele pe care le coordonez
-  for (const g of grupuriCoordonate) for (const id of membriGrup(g)) oamenii.add(id)
 
   const evenimenteMele = date.evenimente.filter((e) => e.pm.includes(me.id))
   const sunPm = evenimenteMele.length > 0
@@ -45,10 +42,7 @@ export function construiesteCtx(date, me, rol) {
     t.creat_de === me.id ||
     (t.tip === 'eveniment' && pmLaEveniment(t.eveniment_id)) ||
     (t.grup_id && grupuriCoordonate.has(t.grup_id))
-  const poateDelega = (t) =>
-    poateGestiona(t) ||
-    (t.responsabil_id && oamenii.has(t.responsabil_id)) ||
-    (t.responsabil_id === me.id && sunCoordonator)
+  const poateDelega = (t) => poateGestiona(t) || (t.responsabil_id === me.id && sunCoordonator)
   // La taskurile Media statusul îl schimbă responsabilul, coordonatorul departamentului și adminul; cel care a deschis taskul îl poate doar anula.
   const poateAnula = (t) =>
     t.tip === 'solicitare' ? admin || (t.creat_de === me.id && (t.status === 'de_facut' || t.status === 'in_lucru')) : poateGestiona(t)
@@ -60,9 +54,10 @@ export function construiesteCtx(date, me, rol) {
   const taskuriMele = date.taskuri.filter(
     (t) => t.responsabil_id === me.id || t.creat_de === me.id || (colabDupaTask[t.id] || []).includes(me.id)
   )
-  const taskuriDepartament = date.taskuri.filter(
-    (t) => (t.grup_id && grupuriCoordonate.has(t.grup_id)) || (t.responsabil_id && oamenii.has(t.responsabil_id))
-  )
+  // Un task aparține doar departamentului din câmpul „grup" (fiecare task se numără o singură dată)
+  const taskuriDepartament = date.taskuri.filter((t) => t.grup_id && grupuriCoordonate.has(t.grup_id))
+  // câte taskuri deschise are un membru în afara departamentului (doar cifra, din funcția sigură din baza de date)
+  const inAfara = (grupId, angajatId) => date.inAfara?.[`${grupId}:${angajatId}`] || 0
 
   return {
     me, rol, admin,
@@ -72,7 +67,7 @@ export function construiesteCtx(date, me, rol) {
     colabDupaTask, comportament, evenimentAnulat, pmLaEveniment,
     categMap, categorieTip, responsabiliCategorie, poateCreaSolicitare, categoriiActive, campuriCategorie, eticheta, poateAnula,
     poateGestiona, poateDelega, poateSchimbaStatus, inghetat,
-    taskuriMele, taskuriDepartament,
+    taskuriMele, taskuriDepartament, inAfara,
     nume: (id) => angajatiMap[id]?.nume_complet || '—',
     // angajații activi care au acces la Taskuri (doar ei pot primi taskuri)
     angajatiCuAcces: date.angajati.filter((a) => a.activ && date.acces[a.id]),

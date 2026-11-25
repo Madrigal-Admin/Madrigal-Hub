@@ -54,16 +54,17 @@ export default function Dashboard({ angajat, tooluri = [], onNavigate, onOpenCal
 
   const departamente = useMemo(() => {
     if (!ctx) return []
+    // Fiecare task se numără o singură dată, la departamentul din câmpul „grup"
     const numara = {}
-    for (const t of ctx.taskuri) if (esteDeschis(t) && t.responsabil_id) numara[t.responsabil_id] = (numara[t.responsabil_id] || 0) + 1
+    for (const t of ctx.taskuri) if (esteDeschis(t) && t.responsabil_id && t.grup_id) numara[`${t.grup_id}:${t.responsabil_id}`] = (numara[`${t.grup_id}:${t.responsabil_id}`] || 0) + 1
     return ctx.grupuri
-      .filter((g) => g.activ && ctx.grupuriCoordonate.has(g.id))
+      .filter((g) => g.activ && (ctx.admin || ctx.grupuriCoordonate.has(g.id)))
       .map((g) => ({
         id: g.id,
         nume: g.nume,
         membri: ctx.membri
           .filter((m) => m.grup_id === g.id)
-          .map((m) => ({ id: m.angajat_id, nume: ctx.nume(m.angajat_id), nr: numara[m.angajat_id] || 0 }))
+          .map((m) => ({ id: m.angajat_id, nume: ctx.nume(m.angajat_id), nr: numara[`${g.id}:${m.angajat_id}`] || 0, afara: ctx.inAfara(g.id, m.angajat_id) }))
           .sort((a, b) => b.nr - a.nr),
       }))
   }, [ctx])

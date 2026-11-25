@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { luna, zi } from './date'
 import { ChipRisc } from '../taskuri/RiscEvenimente'
 
@@ -66,8 +67,12 @@ export function EvenimenteleMele({ evenimente, progres, statusuri, onStart, onTo
   )
 }
 
+const HASURI = 'repeating-linear-gradient(45deg, #C9D1DF 0 4px, #E9EDF3 4px 8px)'
+
 export function EchipaMea({ departamente, onToate }) {
+  const [arataRestul, setArataRestul] = useState(true)
   if (departamente.length === 0) return null
+  const existaAfara = departamente.some((d) => d.membri.some((m) => m.afara > 0))
   return (
     <section aria-label="Echipa mea" className={carcasa}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
@@ -75,7 +80,7 @@ export function EchipaMea({ departamente, onToate }) {
         <span className="text-xs font-semibold text-[#5B6578]">Sunt coordonator departament</span>
       </div>
       {departamente.map((d) => {
-        const max = Math.max(1, ...d.membri.map((m) => m.nr))
+        const max = Math.max(1, ...d.membri.map((m) => m.nr + (arataRestul ? m.afara : 0)))
         return (
           <div key={d.id} className="mt-3.5">
             <div className="text-[13px] font-semibold text-[#5B6578]">{d.nume} · taskuri deschise pe persoană</div>
@@ -84,10 +89,14 @@ export function EchipaMea({ departamente, onToate }) {
                 <div key={m.id}>
                   <div className="flex justify-between text-sm font-semibold">
                     <span>{m.nume}</span>
-                    <span>{m.nr} {m.nr === 1 ? 'task' : 'taskuri'}</span>
+                    <span>
+                      {m.nr} {m.nr === 1 ? 'task' : 'taskuri'}
+                      {arataRestul && m.afara > 0 && <span className="ml-1.5 font-medium text-[#5B6578]">+{m.afara} în afara departamentului</span>}
+                    </span>
                   </div>
-                  <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-[#E9EDF3]">
-                    <div className="h-2 rounded-full bg-accent" style={{ width: `${Math.round((m.nr / max) * 100)}%` }} />
+                  <div className="mt-1.5 flex h-2 overflow-hidden rounded-full bg-[#E9EDF3]">
+                    <div className="h-2 bg-accent" style={{ width: `${(m.nr / max) * 100}%` }} />
+                    {arataRestul && m.afara > 0 && <div className="h-2" style={{ width: `${(m.afara / max) * 100}%`, background: HASURI }} />}
                   </div>
                 </div>
               ))}
@@ -95,7 +104,13 @@ export function EchipaMea({ departamente, onToate }) {
           </div>
         )
       })}
-      <button type="button" onClick={onToate} className="mt-3.5 inline-block py-3 text-sm font-bold text-accent hover:underline">Vezi echipa mea →</button>
+      {existaAfara && (
+        <label className="mt-3.5 flex min-h-[44px] cursor-pointer items-center gap-2 text-sm font-semibold text-[#5B6578]">
+          <input type="checkbox" checked={arataRestul} onChange={(e) => setArataRestul(e.target.checked)} className="h-4 w-4" />
+          Arată și restul taskurilor membrilor
+        </label>
+      )}
+      <button type="button" onClick={onToate} className="mt-1 inline-block py-3 text-sm font-bold text-accent hover:underline">Vezi echipa mea →</button>
     </section>
   )
 }

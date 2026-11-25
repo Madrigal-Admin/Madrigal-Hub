@@ -78,8 +78,10 @@ export function PaginaDepartament() {
   const grupAles = grupuri.some((g) => g.id === grup) ? grup : ''
   const idsGrupuri = new Set(grupAles ? [grupAles] : grupuri.map((g) => g.id))
   const idsMembri = new Set(ctx.membri.filter((m) => idsGrupuri.has(m.grup_id)).map((m) => m.angajat_id))
-  const baza = ctx.admin ? ctx.taskuri.filter((t) => t.tip === 'operational' || t.tip === 'solicitare') : ctx.taskuriDepartament
-  const taskuri = baza.filter((t) => (t.grup_id && idsGrupuri.has(t.grup_id)) || (t.responsabil_id && idsMembri.has(t.responsabil_id)))
+  // Un task aparține doar departamentului din câmpul „grup": fiecare task apare o singură dată
+  const taskuri = ctx.taskuri.filter((t) => t.grup_id && idsGrupuri.has(t.grup_id))
+  // „în afara departamentului": cifre doar când e ales un singur departament (altfel s-ar număra de două ori)
+  const afara = grupAles ? Object.fromEntries([...idsMembri].map((id) => [id, ctx.inAfara(grupAles, id)])) : {}
   return (
     <Cadru
       titlu="Echipa mea"
@@ -101,7 +103,7 @@ export function PaginaDepartament() {
           ))}
         </div>
       )}
-      <DashboardEchipa taskuri={taskuri} membri={[...idsMembri]} ctx={ctx} />
+      <DashboardEchipa taskuri={taskuri} membri={[...idsMembri]} afara={afara} ctx={ctx} />
       <TaskLista taskuri={taskuri} ctx={ctx} onOpen={(t) => acte.deschideTask(t.id)} />
     </Cadru>
   )
