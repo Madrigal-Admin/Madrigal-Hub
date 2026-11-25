@@ -8,7 +8,7 @@ import ButonExport from './ButonExport'
 // Lista de taskuri cu filtre. Statusul se schimbă direct din listă (prin funcția din baza de date).
 export default function TaskLista({ taskuri, ctx, onOpen, arataEveniment = true, arataResponsabil = true, doarCitire = false, numeFisier = 'taskuri' }) {
   const [text, setText] = useState('')
-  const [filtruStatus, setFiltruStatus] = useState('deschise')
+  const [filtruStatus, setFiltruStatus] = useState('toate')
   const [resp, setResp] = useState('')
   const [eroare, setEroare] = useState('')
 
@@ -39,9 +39,9 @@ export default function TaskLista({ taskuri, ctx, onOpen, arataEveniment = true,
           <input className={`${inputCls} pl-8`} placeholder="Caută după titlu sau eveniment…" value={text} onChange={(e) => setText(e.target.value)} />
         </div>
         <select className={`${inputCls} !w-auto`} value={filtruStatus} onChange={(e) => setFiltruStatus(e.target.value)} aria-label="Status">
+          <option value="toate">Toate</option>
           <option value="deschise">Doar deschise</option>
           <option value="intarziate">Întârziate</option>
-          <option value="toate">Toate</option>
           {STATUSURI.map((s) => (
             <option key={s.cod} value={s.cod}>{s.nume}</option>
           ))}

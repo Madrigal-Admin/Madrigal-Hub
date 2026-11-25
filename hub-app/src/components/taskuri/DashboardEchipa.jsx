@@ -6,10 +6,13 @@ import { felii } from './DashboardTaskuri'
 const LEGENDA = [
   { nume: 'De făcut', culoare: CULORI_STATUS.de_facut },
   { nume: 'În lucru', culoare: CULORI_STATUS.in_lucru },
+  { nume: 'Întârziat', culoare: CULORI_STATUS.intarziat },
 ]
+// Un task întârziat apare o singură dată, în segmentul roșu (nu și la „De făcut" / „În lucru")
 const segmente = (lista) => [
-  { cheie: 'De făcut', valoare: lista.filter((t) => t.status === 'de_facut').length, culoare: CULORI_STATUS.de_facut },
-  { cheie: 'În lucru', valoare: lista.filter((t) => t.status === 'in_lucru').length, culoare: CULORI_STATUS.in_lucru },
+  { cheie: 'De făcut', valoare: lista.filter((t) => t.status === 'de_facut' && !esteIntarziat(t)).length, culoare: CULORI_STATUS.de_facut },
+  { cheie: 'În lucru', valoare: lista.filter((t) => t.status === 'in_lucru' && !esteIntarziat(t)).length, culoare: CULORI_STATUS.in_lucru },
+  { cheie: 'Întârziat', valoare: lista.filter(esteIntarziat).length, culoare: CULORI_STATUS.intarziat },
 ]
 
 // Dashboardul coordonatorului: cine are ce de făcut, pe ce subiecte (taguri) și în ce stare.
@@ -23,8 +26,7 @@ export default function DashboardEchipa({ taskuri, membri, afara = {}, ctx }) {
     deschise.forEach((t) => t.responsabil_id && ids.add(t.responsabil_id))
     const randuri = [...ids].map((id) => {
       const lista = deschise.filter((t) => t.responsabil_id === id)
-      const intarz = lista.filter(esteIntarziat).length
-      return { nume: ctx.nume(id), segmente: segmente(lista), eticheta: intarz ? `${intarz} înt.` : '', total: lista.length, afara: arataRestul ? afara[id] || 0 : 0 }
+      return { nume: ctx.nume(id), segmente: segmente(lista), eticheta: '', total: lista.length, afara: arataRestul ? afara[id] || 0 : 0 }
     })
     const fara = deschise.filter((t) => !t.responsabil_id)
     if (fara.length) randuri.push({ nume: 'Fără responsabil', segmente: segmente(fara), eticheta: '', total: fara.length })

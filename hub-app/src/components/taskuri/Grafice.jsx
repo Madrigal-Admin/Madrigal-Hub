@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
+import { esteIntarziat } from '../../lib/taskuri/ui'
 
 // Grafice simple desenate direct în SVG/HTML (fără biblioteci), folosite de dashboardurile
 // „Evenimentele mele" și „Echipa mea".
-export const CULORI_STATUS = { de_facut: '#9AA6B8', in_lucru: '#E0A21B', terminat: '#2E9E6B', anulat: '#D5D9E0' }
+export const CULORI_STATUS = { de_facut: '#9AA6B8', in_lucru: '#E0A21B', terminat: '#2E9E6B', anulat: '#D5D9E0', intarziat: '#C0392B' }
 export const CULORI_SERIE = ['#22406B', '#D4537E', '#E0A21B', '#1D9E75', '#7F77DD', '#D85A30', '#378ADD', '#639922', '#BA7517', '#5F5E5A']
 export const CULOARE_FARA = '#C3CAD6'
 
@@ -141,6 +142,7 @@ const LUNI_SCURT = ['ian', 'feb', 'mar', 'apr', 'mai', 'iun', 'iul', 'aug', 'sep
 const LUNI_STATUS = [
   { cod: 'de_facut', nume: 'De făcut', culoare: CULORI_STATUS.de_facut },
   { cod: 'in_lucru', nume: 'În lucru', culoare: CULORI_STATUS.in_lucru },
+  { cod: 'intarziat', nume: 'Întârziat', culoare: CULORI_STATUS.intarziat },
   { cod: 'terminat', nume: 'Terminat', culoare: CULORI_STATUS.terminat },
 ]
 
@@ -158,16 +160,18 @@ export function TaskuriPeLuni({ titlu = 'Taskuri pe luni', taskuri, persoane }) 
     return lista
   }, [])
   const date = useMemo(() => {
-    const per = Object.fromEntries(luni.map((l) => [l.cheie, { de_facut: 0, in_lucru: 0, terminat: 0 }]))
+    const per = Object.fromEntries(luni.map((l) => [l.cheie, { de_facut: 0, in_lucru: 0, intarziat: 0, terminat: 0 }]))
     for (const t of taskuri) {
       if (!t.termen || (persoana && t.responsabil_id !== persoana)) continue
       const c = per[t.termen.slice(0, 7)]
-      if (c && c[t.status] !== undefined) c[t.status]++
+      // un task întârziat se numără o singură dată, la „Întârziat"
+      const cod = esteIntarziat(t) ? 'intarziat' : t.status
+      if (c && c[cod] !== undefined) c[cod]++
     }
     return luni.map((l) => ({ ...l, ...per[l.cheie] }))
   }, [taskuri, persoana, luni])
 
-  const totalLuna = (d) => d.de_facut + d.in_lucru + d.terminat
+  const totalLuna = (d) => d.de_facut + d.in_lucru + d.intarziat + d.terminat
   const maxim = Math.max(...date.map(totalLuna), 0)
   const mx = Math.max(4, Math.ceil(maxim / 4) * 4)
   const W = 520, H = 230, x0 = 26, yb = 200, yt = 14
