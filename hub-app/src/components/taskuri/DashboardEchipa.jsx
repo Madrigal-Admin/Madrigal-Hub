@@ -62,10 +62,12 @@ export default function DashboardEchipa({ taskuri, membri, afara = {}, ctx }) {
         ]}
       />
       {existaAfara && (
-        <label className="flex min-h-[44px] w-fit cursor-pointer items-center gap-2 text-sm font-semibold text-[#5B6578]">
-          <input type="checkbox" checked={arataRestul} onChange={(e) => setArataRestul(e.target.checked)} className="h-4 w-4" />
-          Arată și restul taskurilor membrilor
-        </label>
+        <button type="button" role="switch" aria-checked={arataRestul} onClick={() => setArataRestul((v) => !v)} className="inline-flex min-h-[44px] items-center gap-2 text-sm font-semibold text-[#5B6578]">
+          <span className={`relative inline-block h-[18px] w-[30px] rounded-full transition-colors ${arataRestul ? 'bg-accent' : 'bg-[#CBD3E0]'}`}>
+            <span className={`absolute top-[2px] h-[14px] w-[14px] rounded-full bg-white transition-all ${arataRestul ? 'left-[14px]' : 'left-[2px]'}`} />
+          </span>
+          Arată și restul taskurilor membrilor (bara hașurată = în afara departamentului)
+        </button>
       )}
       <div className="grid gap-4 lg:grid-cols-2">
         <BareStivuite titlu="Încărcare pe persoană (taskuri deschise)" randuri={peOameni} legenda={LEGENDA} gol="Nu sunt oameni sau taskuri în selecție." />
