@@ -103,8 +103,7 @@ export function PaginaDepartament() {
           ))}
         </div>
       )}
-      <DashboardEchipa taskuri={taskuri} membri={[...idsMembri]} afara={afara} ctx={ctx} />
-      <TaskLista taskuri={taskuri} ctx={ctx} onOpen={(t) => acte.deschideTask(t.id)} />
+      <DashboardEchipa taskuri={taskuri} membri={[...idsMembri]} afara={afara} ctx={ctx} onOpen={(t) => acte.deschideTask(t.id)} />
     </Cadru>
   )
 }

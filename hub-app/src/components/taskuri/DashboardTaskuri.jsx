@@ -16,9 +16,9 @@ export function felii(taskuri, ctx) {
     .map((f, i) => ({ ...f, culoare: f.fara ? CULOARE_FARA : CULORI_SERIE[i % CULORI_SERIE.length] }))
   // Taskurile întârziate au felia lor roșie și nu se mai numără și la „De făcut" / „În lucru"
   const status = [
-    ...['de_facut', 'in_lucru'].map((cod) => ({ nume: NUME_STATUS[cod], valoare: active.filter((t) => t.status === cod && !esteIntarziat(t)).length, culoare: CULORI_STATUS[cod] })),
-    { nume: 'Întârziat', valoare: active.filter(esteIntarziat).length, culoare: CULORI_STATUS.intarziat },
-    { nume: NUME_STATUS.terminat, valoare: active.filter((t) => t.status === 'terminat').length, culoare: CULORI_STATUS.terminat },
+    ...['de_facut', 'in_lucru'].map((cod) => ({ cod: `${cod}_curent`, nume: NUME_STATUS[cod], valoare: active.filter((t) => t.status === cod && !esteIntarziat(t)).length, culoare: CULORI_STATUS[cod] })),
+    { cod: 'intarziate', nume: 'Întârziat', valoare: active.filter(esteIntarziat).length, culoare: CULORI_STATUS.intarziat },
+    { cod: 'terminat', nume: NUME_STATUS.terminat, valoare: active.filter((t) => t.status === 'terminat').length, culoare: CULORI_STATUS.terminat },
   ]
   return { active, responsabil, status }
 }

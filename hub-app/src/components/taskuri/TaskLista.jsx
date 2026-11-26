@@ -6,10 +6,15 @@ import TabelTaskuri from './TabelTaskuri'
 import ButonExport from './ButonExport'
 
 // Lista de taskuri cu filtre. Statusul se schimbă direct din listă (prin funcția din baza de date).
-export default function TaskLista({ taskuri, ctx, onOpen, arataEveniment = true, arataResponsabil = true, doarCitire = false, numeFisier = 'taskuri' }) {
+export default function TaskLista({ taskuri, ctx, onOpen, arataEveniment = true, arataResponsabil = true, doarCitire = false, numeFisier = 'taskuri', status, onStatus, resp: respExtern, onResp, extraFiltre = null }) {
+  // Filtrele pot fi controlate din exterior (dashboardul „Echipa mea"); altfel își țin singure starea.
   const [text, setText] = useState('')
-  const [filtruStatus, setFiltruStatus] = useState('toate')
-  const [resp, setResp] = useState('')
+  const [statusInt, setStatusInt] = useState('toate')
+  const [respInt, setRespInt] = useState('')
+  const filtruStatus = status ?? statusInt
+  const setFiltruStatus = onStatus ?? setStatusInt
+  const resp = respExtern ?? respInt
+  const setResp = onResp ?? setRespInt
   const [eroare, setEroare] = useState('')
 
   const responsabili = useMemo(() => {
@@ -23,7 +28,9 @@ export default function TaskLista({ taskuri, ctx, onOpen, arataEveniment = true,
       taskuri.filter((t) => {
         if (filtruStatus === 'deschise' && !estePrelucrat(t)) return false
         if (filtruStatus === 'intarziate' && !esteIntarziat(t)) return false
-        if (!['deschise', 'toate', 'intarziate'].includes(filtruStatus) && t.status !== filtruStatus) return false
+        if (filtruStatus === 'de_facut_curent' && !(t.status === 'de_facut' && !esteIntarziat(t))) return false
+        if (filtruStatus === 'in_lucru_curent' && !(t.status === 'in_lucru' && !esteIntarziat(t))) return false
+        if (!['deschise', 'toate', 'intarziate', 'de_facut_curent', 'in_lucru_curent'].includes(filtruStatus) && t.status !== filtruStatus) return false
         if (resp === '__nimeni' ? t.responsabil_id : resp && t.responsabil_id !== resp) return false
         if (q && !t.titlu.toLowerCase().includes(q) && !(ctx.evMap[t.eveniment_id]?.nume || '').toLowerCase().includes(q)) return false
         return true
@@ -45,6 +52,8 @@ export default function TaskLista({ taskuri, ctx, onOpen, arataEveniment = true,
           {STATUSURI.map((s) => (
             <option key={s.cod} value={s.cod}>{s.nume}</option>
           ))}
+          {filtruStatus === 'de_facut_curent' && <option value="de_facut_curent">De făcut (fără întârziate)</option>}
+          {filtruStatus === 'in_lucru_curent' && <option value="in_lucru_curent">În lucru (fără întârziate)</option>}
         </select>
         {arataResponsabil && (
           <select className={`${inputCls} !w-auto`} value={resp} onChange={(e) => setResp(e.target.value)} aria-label="Responsabil">
@@ -55,9 +64,10 @@ export default function TaskLista({ taskuri, ctx, onOpen, arataEveniment = true,
             ))}
           </select>
         )}
+        {extraFiltre}
         <span className="text-xs text-slate-400">{vizibile.length} din {taskuri.length}</span>
         <ButonExport taskuri={vizibile} ctx={ctx} numeFisier={numeFisier} filtre={[
-          ['Status', filtruStatus === 'deschise' ? 'Doar deschise' : filtruStatus === 'toate' ? 'Toate' : filtruStatus === 'intarziate' ? 'Întârziate' : STATUSURI.find((x) => x.cod === filtruStatus)?.nume],
+          ['Status', filtruStatus === 'deschise' ? 'Doar deschise' : filtruStatus === 'toate' ? 'Toate' : filtruStatus === 'intarziate' ? 'Întârziate' : filtruStatus === 'de_facut_curent' ? 'De făcut (fără întârziate)' : filtruStatus === 'in_lucru_curent' ? 'În lucru (fără întârziate)' : STATUSURI.find((x) => x.cod === filtruStatus)?.nume],
           ['Responsabil', resp === '__nimeni' ? 'Fără responsabil' : resp ? ctx.nume(resp) : 'Toți'],
           ['Căutare text', text.trim() || '—'],
         ]} />

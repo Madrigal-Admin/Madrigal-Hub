@@ -15,7 +15,7 @@ function felieSvg(cx, cy, r, a0, a1) {
 }
 
 // felii: [{ nume, valoare, culoare }] — inel cu totalul în mijloc, legenda lângă el (nume, număr, procent).
-export function Placinta({ titlu, felii, gol = 'Nu sunt taskuri.' }) {
+export function Placinta({ titlu, felii, gol = 'Nu sunt taskuri.', ingust = false, onFelie, activ }) {
   const vizibile = felii.filter((f) => f.valoare > 0)
   const total = vizibile.reduce((s, f) => s + f.valoare, 0)
   const R = 70
@@ -27,13 +27,13 @@ export function Placinta({ titlu, felii, gol = 'Nu sunt taskuri.' }) {
       {total === 0 ? (
         <p className="mt-4 text-sm text-[#5B6578]">{gol}</p>
       ) : (
-        <div className="flex flex-1 flex-wrap items-center justify-center gap-x-10 gap-y-4 py-2">
-          <svg viewBox="0 0 190 190" className="aspect-square w-full max-w-[260px] shrink-0 sm:w-[260px]" role="img" aria-label={`${titlu}: ${vizibile.map((f) => `${f.nume} ${f.valoare}`).join(', ')}`}>
+        <div className={`flex flex-1 items-center justify-center py-2 ${ingust ? 'flex-col gap-y-3' : 'flex-wrap gap-x-10 gap-y-4'}`}>
+          <svg viewBox="0 0 190 190" className={`aspect-square shrink-0 ${ingust ? 'w-full max-w-[170px]' : 'w-full max-w-[260px] sm:w-[260px]'}`} role="img" aria-label={`${titlu}: ${vizibile.map((f) => `${f.nume} ${f.valoare}`).join(', ')}`}>
             <circle cx="95" cy="95" r={R} fill="none" stroke="#EEF1F6" strokeWidth="26" />
             {vizibile.map((f) => {
               const lung = (f.valoare / total) * L
               const el = (
-                <circle key={f.nume} cx="95" cy="95" r={R} fill="none" stroke={f.culoare} strokeWidth="26" transform="rotate(-90 95 95)"
+                <circle key={f.nume} cx="95" cy="95" r={R} fill="none" stroke={f.culoare} strokeWidth={activ && activ === f.cod ? 32 : 26} transform="rotate(-90 95 95)" className={onFelie && f.cod ? 'cursor-pointer' : ''} onClick={onFelie && f.cod ? () => onFelie(f) : undefined}
                   strokeDasharray={`${vizibile.length === 1 ? L : Math.max(lung - 3, 0.5)} ${L}`} strokeDashoffset={-deplasare} />
               )
               deplasare += lung
@@ -42,15 +42,27 @@ export function Placinta({ titlu, felii, gol = 'Nu sunt taskuri.' }) {
             <text x="95" y="99" textAnchor="middle" fontSize="34" fontWeight="800" fill="#172036">{total}</text>
             <text x="95" y="121" textAnchor="middle" fontSize="12" fill="#5B6578">taskuri</text>
           </svg>
-          <ul className="space-y-3 text-[15px]">
-            {felii.map((f) => (
-              <li key={f.nume} className="grid grid-cols-[12px_minmax(80px,auto)_32px_48px] items-center gap-2.5">
-                <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: f.culoare }} />
-                <span className="truncate text-[#3A465C]" title={f.nume}>{f.nume}</span>
-                <b className="text-right text-[#172036]">{f.valoare}</b>
-                <span className="text-right text-[13px] text-[#5B6578]">{Math.round((f.valoare / total) * 100)}%</span>
-              </li>
-            ))}
+          <ul className={ingust ? 'grid w-full grid-cols-2 gap-x-2 gap-y-0.5 text-[14px]' : 'space-y-3 text-[15px]'}>
+            {felii.map((f) => {
+              const interior = (
+                <>
+                  <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: f.culoare }} />
+                  <span className="truncate text-left text-[#3A465C]" title={f.nume}>{f.nume}</span>
+                  <b className="text-right text-[#172036]">{f.valoare}</b>
+                  {!ingust && <span className="text-right text-[13px] text-[#5B6578]">{Math.round((f.valoare / total) * 100)}%</span>}
+                </>
+              )
+              const cls = `grid items-center gap-2.5 ${ingust ? 'grid-cols-[10px_1fr_auto_auto] gap-x-1.5' : 'grid-cols-[12px_minmax(80px,auto)_32px_48px]'}`
+              return (
+                <li key={f.nume}>
+                  {onFelie && f.cod ? (
+                    <button type="button" onClick={() => onFelie(f)} aria-pressed={activ === f.cod} title="Filtrează lista de mai jos" className={`${cls} w-full rounded-lg px-1.5 py-1 hover:bg-[#F2F5FA] ${activ === f.cod ? 'bg-[#E7ECF6] ring-1 ring-accent' : ''}`}>{interior}</button>
+                  ) : (
+                    <div className={cls}>{interior}</div>
+                  )}
+                </li>
+              )
+            })}
           </ul>
         </div>
       )}
@@ -88,7 +100,7 @@ export function ProgresPeTag({ titlu, randuri, gol = 'Niciun task cu tag.' }) {
 }
 
 // Bare orizontale stivuite: randuri = [{ nume, segmente: [{ cheie, valoare, culoare }], eticheta }]
-export function BareStivuite({ titlu, randuri, legenda = [], gol = 'Nu sunt date.' }) {
+export function BareStivuite({ titlu, randuri, legenda = [], gol = 'Nu sunt date.', ingust = false, onSegment, onNume, activNume }) {
   const max = Math.max(1, ...randuri.map((r) => r.segmente.reduce((s, x) => s + x.valoare, 0) + (r.afara || 0)))
   return (
     <section className="min-w-0 rounded-[14px] border border-[#E1E4EA] bg-white p-4 sm:p-5" aria-label={titlu}>
@@ -103,19 +115,23 @@ export function BareStivuite({ titlu, randuri, legenda = [], gol = 'Nu sunt date
       {randuri.length === 0 ? (
         <p className="mt-4 text-sm text-[#5B6578]">{gol}</p>
       ) : (
-        <ul className="mt-3 max-h-72 space-y-2.5 overflow-y-auto pr-1">
+        <ul className={`mt-3 space-y-2.5 overflow-y-auto pr-1 ${ingust ? 'max-h-[17.5rem]' : 'max-h-72'}`}>
           {randuri.map((r) => {
             const total = r.segmente.reduce((s, x) => s + x.valoare, 0)
             return (
               <li key={r.nume} className="flex items-center gap-3 text-sm">
-                <span className="w-32 shrink-0 truncate font-semibold text-[#172036] sm:w-40" title={r.nume}>{r.nume}</span>
+                {onNume && r.id !== undefined ? (
+                  <button type="button" onClick={() => onNume(r)} title="Filtrează lista de mai jos" className={`shrink-0 truncate rounded px-1 text-left font-semibold ${ingust ? 'w-24' : 'w-32 sm:w-40'} ${activNume === r.id ? 'bg-accent text-white' : 'text-[#172036] hover:bg-[#EEF1F6]'}`}>{r.nume}</button>
+                ) : (
+                  <span className={`shrink-0 truncate font-semibold text-[#172036] ${ingust ? 'w-24' : 'w-32 sm:w-40'}`} title={r.nume}>{r.nume}</span>
+                )}
                 <div className="flex h-5 flex-1 overflow-hidden rounded bg-[#EEF1F6]">
                   {r.segmente.filter((x) => x.valoare > 0).map((x) => (
-                    <div key={x.cheie} title={`${x.cheie}: ${x.valoare}`} style={{ width: `${(x.valoare / max) * 100}%`, backgroundColor: x.culoare }} />
+                    <div key={x.cheie} title={`${x.cheie}: ${x.valoare}`} onClick={onSegment && x.cod ? () => onSegment(r, x) : undefined} className={onSegment && x.cod ? 'cursor-pointer hover:brightness-90' : ''} style={{ width: `${(x.valoare / max) * 100}%`, backgroundColor: x.culoare }} />
                   ))}
                   {r.afara > 0 && <div title={`+${r.afara} în afara departamentului`} style={{ width: `${(r.afara / max) * 100}%`, background: 'repeating-linear-gradient(45deg, #C9D1DF 0 4px, #E9EDF3 4px 8px)' }} />}
                 </div>
-                <span className="w-24 shrink-0 text-right text-[13px] text-[#5B6578]">{total}{r.afara > 0 ? <span className="ml-1">+{r.afara}</span> : null}{r.eticheta ? <b className="ml-1 text-[#B4332E]">{r.eticheta}</b> : null}</span>
+                <span className={`shrink-0 text-right text-[13px] text-[#5B6578] ${ingust ? 'w-12' : 'w-24'}`}>{total}{r.afara > 0 ? <span className="ml-1">+{r.afara}</span> : null}{r.eticheta ? <b className="ml-1 text-[#B4332E]">{r.eticheta}</b> : null}</span>
               </li>
             )
           })}
@@ -146,53 +162,92 @@ const LUNI_STATUS = [
   { cod: 'terminat', nume: 'Terminat', culoare: CULORI_STATUS.terminat },
 ]
 
-// Taskuri pe luni (ultimele 12, după termen), stivuite pe status; filtru opțional pe persoană.
-// persoane: [{ id, nume }]
-export function TaskuriPeLuni({ titlu = 'Taskuri pe luni', taskuri, persoane }) {
-  const [persoana, setPersoana] = useState('')
-  const luni = useMemo(() => {
-    const acum = new Date()
-    const lista = []
-    for (let i = 11; i >= 0; i--) {
-      const d = new Date(acum.getFullYear(), acum.getMonth() - i, 1)
-      lista.push({ cheie: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`, luna: d.getMonth(), an: d.getFullYear() })
+// Taskuri în timp, stivuite pe status, după termen. Treapta se alege singură după perioadă:
+// fără perioadă = 12 luni (6 înapoi, luna curentă, 5 înainte); ≤7 zile = pe zile; ≤31 zile = pe săptămâni; altfel pe luni.
+// iv: { start, end } (AAAA-LL-ZZ) sau null; persoane: [{ id, nume }]
+const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+const ZILE_SCURT = ['dum', 'lun', 'mar', 'mie', 'joi', 'vin', 'sâm']
+function construiesteCosuri(iv) {
+  const luniDin = (a, b) => {
+    const out = []
+    for (let d = new Date(a.getFullYear(), a.getMonth(), 1); d <= b; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) {
+      out.push({ eticheta: LUNI_SCURT[d.getMonth()], sub: d.getMonth() === 0 || out.length === 0 ? String(d.getFullYear()) : '', de: iso(d), la: iso(new Date(d.getFullYear(), d.getMonth() + 1, 0)) })
     }
-    return lista
-  }, [])
+    return out
+  }
+  if (!iv) {
+    const acum = new Date()
+    return { tip: 'luni', cosuri: luniDin(new Date(acum.getFullYear(), acum.getMonth() - 6, 1), new Date(acum.getFullYear(), acum.getMonth() + 5, 1)) }
+  }
+  const [a, b] = [iv.start, iv.end].map((s) => { const [y, m, z] = s.split('-').map(Number); return new Date(y, m - 1, z) })
+  const zile = Math.round((b - a) / 864e5) + 1
+  if (zile <= 7) {
+    const cosuri = []
+    for (let i = 0; i < zile; i++) { const d = new Date(a); d.setDate(a.getDate() + i); cosuri.push({ eticheta: `${ZILE_SCURT[d.getDay()]} ${d.getDate()}`, sub: '', de: iso(d), la: iso(d) }) }
+    return { tip: 'zile', cosuri }
+  }
+  if (zile <= 31) {
+    const cosuri = []
+    for (let d = new Date(a); d <= b; d.setDate(d.getDate() + 7)) {
+      const e = new Date(d); e.setDate(d.getDate() + 6); if (e > b) e.setTime(b.getTime())
+      cosuri.push({ eticheta: `${d.getDate()}–${e.getDate()}`, sub: LUNI_SCURT[d.getMonth()], de: iso(d), la: iso(e) })
+    }
+    return { tip: 'săptămâni', cosuri }
+  }
+  return { tip: 'luni', cosuri: luniDin(a, b) }
+}
+
+export function TaskuriPeLuni({ titlu, taskuri, persoane, iv = null, ingust = false }) {
+  const [persoana, setPersoana] = useState('')
+  const { tip, cosuri } = useMemo(() => construiesteCosuri(iv), [iv?.start, iv?.end]) // eslint-disable-line react-hooks/exhaustive-deps
+  const titluAles = titlu || `Taskuri pe ${tip}`
   const date = useMemo(() => {
-    const per = Object.fromEntries(luni.map((l) => [l.cheie, { de_facut: 0, in_lucru: 0, intarziat: 0, terminat: 0 }]))
+    const per = cosuri.map((c) => ({ ...c, de_facut: 0, in_lucru: 0, intarziat: 0, terminat: 0 }))
     for (const t of taskuri) {
       if (!t.termen || (persoana && t.responsabil_id !== persoana)) continue
-      const c = per[t.termen.slice(0, 7)]
-      // un task întârziat se numără o singură dată, la „Întârziat"
-      const cod = esteIntarziat(t) ? 'intarziat' : t.status
+      const z = t.termen.slice(0, 10)
+      const c = per.find((x) => z >= x.de && z <= x.la)
+      const cod = esteIntarziat(t) ? 'intarziat' : t.status // un task întârziat se numără o singură dată
       if (c && c[cod] !== undefined) c[cod]++
     }
-    return luni.map((l) => ({ ...l, ...per[l.cheie] }))
-  }, [taskuri, persoana, luni])
+    return per
+  }, [taskuri, persoana, cosuri])
+  // taskurile care NU apar în grafic: fără termen sau cu termen în afara treptelor (anulatele nu se numără)
+  const nelistate = useMemo(() => {
+    let faraTermen = 0, inAfara = 0
+    for (const t of taskuri) {
+      if (t.status === 'anulat' || (persoana && t.responsabil_id !== persoana)) continue
+      if (!t.termen) faraTermen++
+      else if (!cosuri.some((c) => t.termen.slice(0, 10) >= c.de && t.termen.slice(0, 10) <= c.la)) inAfara++
+    }
+    return { faraTermen, inAfara }
+  }, [taskuri, persoana, cosuri])
 
-  const totalLuna = (d) => d.de_facut + d.in_lucru + d.intarziat + d.terminat
-  const maxim = Math.max(...date.map(totalLuna), 0)
+  const totalCos = (d) => d.de_facut + d.in_lucru + d.intarziat + d.terminat
+  const maxim = Math.max(...date.map(totalCos), 0)
   const mx = Math.max(4, Math.ceil(maxim / 4) * 4)
-  const W = 520, H = 230, x0 = 26, yb = 200, yt = 14
-  const bw = (W - x0) / 12
+  const W = ingust ? 330 : 520, H = 230, x0 = 26, yb = 200, yt = 14
+  const bw = (W - x0) / date.length
+  const lat = Math.min(bw * 0.6, 44)
   const gol = maxim === 0
+  const etichetaMica = bw < 30
+  const afisareEtichete = (i) => !etichetaMica || i % 2 === 0
 
   return (
-    <section className="min-w-0 rounded-[14px] border border-[#E1E4EA] bg-white p-4 sm:p-5" aria-label={titlu}>
+    <section className="min-w-0 rounded-[14px] border border-[#E1E4EA] bg-white p-4 sm:p-5" aria-label={titluAles}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-[15px] font-extrabold text-[#172036]">{titlu}</h3>
+        <h3 className="text-[15px] font-extrabold text-[#172036]">{titluAles}</h3>
         <select value={persoana} onChange={(e) => setPersoana(e.target.value)} aria-label="Filtru angajat"
-          className="max-w-[220px] rounded-lg border border-[#E1E4EA] bg-white px-2 py-1.5 text-sm text-[#172036]">
+          className="max-w-[170px] rounded-lg border border-[#E1E4EA] bg-white px-2 py-1.5 text-sm text-[#172036]">
           <option value="">Toți angajații</option>
           {persoane.map((p) => <option key={p.id} value={p.id}>{p.nume}</option>)}
         </select>
       </div>
       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-[#5B6578]">
         {LUNI_STATUS.map((l) => <span key={l.cod} className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: l.culoare }} />{l.nume}</span>)}
-        <span className="text-[#8A94A6]">· după termen, ultimele 12 luni</span>
+        {!ingust && <span className="text-[#8A94A6]">· după termen{iv ? '' : ': 6 luni înapoi, 5 înainte'}</span>}
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="mt-1 w-full" role="img" aria-label={`${titlu}, ultimele 12 luni`}>
+      <svg viewBox={`0 0 ${W} ${H}`} className="mt-1 w-full" role="img" aria-label={titluAles}>
         {[0, 1, 2, 3, 4].map((i) => {
           const y = yb - ((yb - yt) * i) / 4
           return (
@@ -204,25 +259,31 @@ export function TaskuriPeLuni({ titlu = 'Taskuri pe luni', taskuri, persoane }) 
         })}
         {date.map((d, i) => {
           let y = yb
-          const x = x0 + i * bw + bw * 0.2
-          const tot = totalLuna(d)
+          const cx = x0 + i * bw + bw / 2
+          const x = cx - lat / 2
+          const tot = totalCos(d)
           return (
-            <g key={d.cheie}>
+            <g key={d.de}>
               {LUNI_STATUS.map((st) => {
                 const v = d[st.cod]
                 if (!v) return null
                 const h = ((yb - yt) * v) / mx
                 y -= h
-                return <rect key={st.cod} x={x} y={y} width={bw * 0.6} height={Math.max(h - 1, 1)} rx="2" fill={st.culoare}><title>{`${LUNI_SCURT[d.luna]} ${d.an}: ${st.nume} ${v}`}</title></rect>
+                return <rect key={st.cod} x={x} y={y} width={lat} height={Math.max(h - 1, 1)} rx="2" fill={st.culoare}><title>{`${d.eticheta}${d.sub ? ` ${d.sub}` : ''}: ${st.nume} ${v}`}</title></rect>
               })}
-              {tot > 0 && <text x={x0 + i * bw + bw / 2} y={y - 4} textAnchor="middle" fontSize="10" fontWeight="700" fill="#172036">{tot}</text>}
-              <text x={x0 + i * bw + bw / 2} y={yb + 14} textAnchor="middle" fontSize="10" fill="#5B6578">{LUNI_SCURT[d.luna]}</text>
-              {(i === 0 || d.luna === 0) && <text x={x0 + i * bw + bw / 2} y={yb + 26} textAnchor="middle" fontSize="9" fill="#8A94A6">{d.an}</text>}
+              {tot > 0 && <text x={cx} y={y - 4} textAnchor="middle" fontSize="10" fontWeight="700" fill="#172036">{tot}</text>}
+              {afisareEtichete(i) && <text x={cx} y={yb + 14} textAnchor="middle" fontSize="10" fill="#5B6578">{d.eticheta}</text>}
+              {afisareEtichete(i) && d.sub && <text x={cx} y={yb + 26} textAnchor="middle" fontSize="9" fill="#8A94A6">{d.sub}</text>}
             </g>
           )
         })}
       </svg>
-      {gol && <p className="-mt-1 text-center text-xs text-[#5B6578]">Niciun task cu termen în ultimele 12 luni{persoana ? ' pentru persoana aleasă' : ''}.</p>}
+      {gol && <p className="-mt-1 text-center text-xs text-[#5B6578]">Niciun task cu termen în această perioadă{persoana ? ' pentru persoana aleasă' : ''}.</p>}
+      {(nelistate.faraTermen > 0 || nelistate.inAfara > 0) && (
+        <p className="mt-1 text-xs text-[#5B6578]">
+          Nu apar în grafic:{nelistate.faraTermen > 0 ? ` ${nelistate.faraTermen} fără termen` : ''}{nelistate.faraTermen > 0 && nelistate.inAfara > 0 ? ',' : ''}{nelistate.inAfara > 0 ? ` ${nelistate.inAfara} cu termen în afara acestor luni` : ''}.
+        </p>
+      )}
     </section>
   )
 }
