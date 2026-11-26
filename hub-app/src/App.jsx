@@ -181,7 +181,7 @@ export default function App() {
     <TaskuriProvider angajat={angajat} accesTooluri={accesTooluri}>
       <Shell angajat={angajat} tooluri={tooluri} view={viewEfectiv} onNavigate={navigateTo} onSignOut={handleSignOut}>
         {viewEfectiv === 'dashboard' && <Dashboard angajat={angajat} tooluri={tooluri} onNavigate={navigateTo} onOpenCalendar={() => navigateTo('calendar')} />}
-        {viewEfectiv === 'calendar' && <CalendarView canManageCalendar={canManageCalendar} canSeeStatistici={canSeeStatistici} />}
+        {viewEfectiv === 'calendar' && <CalendarView canManageCalendar={canManageCalendar} canSeeStatistici={canSeeStatistici} meId={angajat?.id} />}
         {viewEfectiv === 'admin' && <AdminLayout />}
         {viewEfectiv === 'evenimente' && <PaginaEvenimente />}
         {viewEfectiv === 'departament' && <PaginaDepartament />}

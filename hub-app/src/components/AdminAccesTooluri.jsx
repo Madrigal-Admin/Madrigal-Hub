@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../supabaseClient'
 import FiltruAngajati, { FILTRU_GOL, potrivesteFiltru } from './FiltruAngajati'
 
@@ -50,6 +50,23 @@ export default function AdminAccesTooluri() {
   const [bulkRol, setBulkRol] = useState('angajat')
   const [bulkBusy, setBulkBusy] = useState(false)
   const [bulkMesaj, setBulkMesaj] = useState('')
+  const cadruRef = useRef(null)
+  const [inaltime, setInaltime] = useState(null)
+
+  // Cadrul tabelului umple exact spațiul rămas pe ecran: pagina nu mai derulează,
+  // derulează doar tabelul (vertical + orizontal, bara orizontală rămâne mereu vizibilă).
+  useEffect(() => {
+    function calculeaza() {
+      const el = cadruRef.current
+      if (!el) return
+      const sus = el.getBoundingClientRect().top
+      setInaltime(Math.max(280, Math.floor(window.innerHeight - sus - 24)))
+    }
+    calculeaza()
+    window.addEventListener('resize', calculeaza)
+    const t = setTimeout(calculeaza, 300) // după ce s-au încărcat filtrele/mesajele de deasupra
+    return () => { window.removeEventListener('resize', calculeaza); clearTimeout(t) }
+  }, [loading, bulkMesaj, selectati.size])
 
   useEffect(() => {
     loadAll()
@@ -186,11 +203,15 @@ export default function AdminAccesTooluri() {
         </div>
       )}
       {bulkMesaj && <p className="mb-3 text-sm text-slate-600">{bulkMesaj}</p>}
-      <div className="bg-white rounded-xl shadow-sm overflow-auto max-h-[calc(100vh-14rem)] [&_th]:sticky [&_th]:top-0 [&_th]:z-[1] [&_th]:bg-slate-50">
+      <div
+        ref={cadruRef}
+        style={inaltime ? { height: inaltime } : { maxHeight: 'calc(100vh - 14rem)' }}
+        className="bg-white rounded-xl shadow-sm overflow-auto [&_th]:sticky [&_th]:top-0 [&_th]:z-[2] [&_th]:bg-slate-50"
+      >
         <table className="w-full text-sm min-w-[620px]">
           <thead className="bg-slate-50 text-slate-500 text-left">
             <tr>
-              <th className="px-4 py-3 w-8">
+              <th className="px-4 py-3 w-12 min-w-[48px] !left-0 !z-[4]">
                 <input
                   type="checkbox"
                   aria-label="Selectează toți angajații afișați"
@@ -198,7 +219,7 @@ export default function AdminAccesTooluri() {
                   onChange={(e) => setSelectati(e.target.checked ? new Set(vizibili.map((a) => a.id)) : new Set())}
                 />
               </th>
-              <th className="px-4 py-3 font-medium">Angajat</th>
+              <th className="px-4 py-3 font-medium min-w-[220px] !left-[48px] !z-[4] border-r border-slate-200">Angajat</th>
               {TOOLS.map((t) => (
                 <th key={t.key} className="px-4 py-3 font-medium">
                   {t.label}
@@ -209,7 +230,7 @@ export default function AdminAccesTooluri() {
           <tbody>
             {vizibili.map((a) => (
               <tr key={a.id} className="border-t border-slate-100">
-                <td className="px-4 py-3">
+                <td className="px-4 py-3 w-12 min-w-[48px] sticky left-0 z-[1] bg-white">
                   <input
                     type="checkbox"
                     aria-label={`Selectează ${a.nume_complet}`}
@@ -217,7 +238,7 @@ export default function AdminAccesTooluri() {
                     onChange={(e) => setSelectati((p) => { const n = new Set(p); e.target.checked ? n.add(a.id) : n.delete(a.id); return n })}
                   />
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-4 py-3 min-w-[220px] sticky left-[48px] z-[1] bg-white border-r border-slate-200">
                   <p className="text-slate-800">{a.nume_complet}</p>
                   <p className="text-xs text-slate-400">{a.email}</p>
                 </td>

@@ -22,6 +22,12 @@ function perioadaContract(c) {
   return `${de} – fără dată de final`
 }
 
+// Numele complet e scris „NUME Prenume ..." — prenumele e al doilea cuvânt (ca în Hub).
+function prenume(numeComplet) {
+  const c = (numeComplet || '').trim().split(/\s+/)
+  return c.length > 1 ? c[1] : c[0] || ''
+}
+
 export default function EmployeeDashboard({ employee, onNavigate }) {
   const [requests, setRequests] = useState([])
   const [certificateRequests, setCertificateRequests] = useState([])
@@ -89,7 +95,7 @@ export default function EmployeeDashboard({ employee, onNavigate }) {
   return (
     <div>
       <h1 className="font-display text-2xl font-semibold text-ink">
-        Bună, {employee.nume_complet.split(' ')[0]}
+        Bună, {prenume(employee.nume_complet)}
       </h1>
       <p className="mt-1 text-sm text-slate-500">
         {employee.department?.name} {employee.position?.name ? `· ${employee.position.name}` : ''}

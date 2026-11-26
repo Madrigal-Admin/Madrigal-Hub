@@ -5,6 +5,7 @@ import EvenimentForm from './EvenimentForm'
 import ListeEvenimente from './ListeEvenimente'
 import StatisticiEvenimente from './StatisticiEvenimente'
 import FiltruMulti from './FiltruMulti'
+import AngajatiPicker from './AngajatiPicker'
 import { useTaskuri } from './taskuri/TaskuriContext'
 import DecalareTermene, { taskuriDecalabile } from './taskuri/DecalareTermene'
 import {
@@ -25,7 +26,7 @@ function Chip({ c, children, taiat }) {
   )
 }
 
-export default function CalendarView({ canManageCalendar, canSeeStatistici }) {
+export default function CalendarView({ canManageCalendar, canSeeStatistici, meId }) {
   const [date, setDate] = useState({ evenimente: [], tipuri: [], statusuri: [], angajati: [] })
   const [eroare, setEroare] = useState('')
   const [loading, setLoading] = useState(true)
@@ -50,6 +51,10 @@ export default function CalendarView({ canManageCalendar, canSeeStatistici }) {
     return new Date(azi.getFullYear(), azi.getMonth(), 1)
   })
   const [ziuaSelectata, setZiuaSelectata] = useState(null)
+  const [cardFiltru, setCardFiltru] = useState(null) // null | 'fara_pm' | 'organizare' | 'definalizat' (cardurile de sus sunt și filtre)
+  const [confirmStatus, setConfirmStatus] = useState(null) // { id, status } — confirmare înainte de Finalizat / Anulat
+  const [pmDeschis, setPmDeschis] = useState(null) // id eveniment cu selectorul de PM deschis
+  const [eroareCard, setEroareCard] = useState(null) // { id, msg }
 
   const { evenimente, tipuri, statusuri, angajati } = date
 
@@ -121,11 +126,72 @@ export default function CalendarView({ canManageCalendar, canSeeStatistici }) {
 
   const azi = ymd(new Date())
 
-  const evenimenteAfisate = useMemo(() => {
-    if (ziuaSelectata) return evenimenteByDate[ziuaSelectata] || []
-    const prefix = `${lunaCurenta.getFullYear()}-${String(lunaCurenta.getMonth() + 1).padStart(2, '0')}`
-    return evenimenteVizibile.filter((e) => zileEveniment(e).some((z) => z.startsWith(prefix)))
-  }, [ziuaSelectata, evenimenteByDate, evenimenteVizibile, lunaCurenta])
+  // --- cardurile de sus (cifre + filtre) ---
+  const compStatus = (e) => statusDupaCod[e.status]?.comportament
+  const prefixLuna = `${lunaCurenta.getFullYear()}-${String(lunaCurenta.getMonth() + 1).padStart(2, '0')}`
+  const inLunaAfisata = (e) => zileEveniment(e).some((z) => z.startsWith(prefixLuna))
+  const faraPm = (e) => compStatus(e) !== 'anulat' && e.pm.length === 0
+  const inOrganizare = (e) => compStatus(e) === 'organizare'
+  // „de finalizat" = evenimente trecute, încă deschise sau în organizare (indiferent de lună)
+  const deFinalizat = (e) => ['deschis', 'organizare'].includes(compStatus(e)) && (e.data_sfarsit || e.data) < azi
+  const evLuna = evenimenteVizibile.filter(inLunaAfisata)
+  const caracteristiciCard = {
+    fara_pm: { nume: 'Fără PM', potrivit: faraPm },
+    organizare: { nume: 'În organizare', potrivit: inOrganizare },
+    definalizat: { nume: 'De finalizat (au trecut)', potrivit: deFinalizat },
+  }
+
+  const evenimenteAfisate = (() => {
+    let lista
+    if (ziuaSelectata) lista = evenimenteByDate[ziuaSelectata] || []
+    else if (cardFiltru === 'definalizat') lista = evenimenteVizibile
+    else lista = evLuna
+    return cardFiltru ? lista.filter(caracteristiciCard[cardFiltru].potrivit) : lista
+  })()
+
+  // --- status și PM direct din card ---
+  const poateSchimbaStatus = (e) => canManageCalendar || (!!meId && e.pm.includes(meId))
+
+  async function schimbaStatus(e, cod) {
+    setEroareCard(null)
+    setConfirmStatus(null)
+    const vechi = e.status
+    setDate((prev) => ({ ...prev, evenimente: prev.evenimente.map((x) => (x.id === e.id ? { ...x, status: cod } : x)) }))
+    const { error } = await supabase.rpc('eveniment_schimba_status', { p_eveniment: e.id, p_status: cod })
+    if (error) {
+      setDate((prev) => ({ ...prev, evenimente: prev.evenimente.map((x) => (x.id === e.id ? { ...x, status: vechi } : x)) }))
+      setEroareCard({ id: e.id, msg: error.message || 'Nu am putut schimba statusul.' })
+      return
+    }
+    ctxTaskuri?.reload?.() // taskurile evenimentului țin cont de status
+  }
+
+  function cereStatus(e, cod) {
+    if (cod === e.status) return
+    const comp = statusDupaCod[cod]?.comportament
+    if (comp === 'finalizat' || comp === 'anulat') {
+      setEroareCard(null)
+      setConfirmStatus({ id: e.id, status: cod })
+    } else {
+      schimbaStatus(e, cod)
+    }
+  }
+
+  async function salveazaPm(e, noua) {
+    setEroareCard(null)
+    const adaugate = noua.filter((id) => !e.pm.includes(id))
+    const scoase = e.pm.filter((id) => !noua.includes(id))
+    setDate((prev) => ({ ...prev, evenimente: prev.evenimente.map((x) => (x.id === e.id ? { ...x, pm: noua } : x)) }))
+    let err = null
+    if (adaugate.length) err = (await supabase.from('eveniment_pm').insert(adaugate.map((a) => ({ eveniment_id: e.id, angajat_id: a })))).error
+    if (!err && scoase.length) err = (await supabase.from('eveniment_pm').delete().eq('eveniment_id', e.id).in('angajat_id', scoase)).error
+    if (err) {
+      setEroareCard({ id: e.id, msg: 'Nu am putut salva PM-ul.' })
+      load()
+      return
+    }
+    ctxTaskuri?.reload?.() // PM-ul poate crea taskuri pe eveniment
+  }
 
   function schimbaLuna(delta) {
     setLunaCurenta((prev) => new Date(prev.getFullYear(), prev.getMonth() + delta, 1))
@@ -170,6 +236,29 @@ export default function CalendarView({ canManageCalendar, canSeeStatistici }) {
                 <BarChart3 size={15} /> Statistici evenimente
               </button>
             )}
+          </div>
+        )}
+
+        {!loading && (
+          <div className="mb-5 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+            {[
+              [null, `Evenimente · ${LUNI[lunaCurenta.getMonth()].toLowerCase()}`, evLuna.filter((e) => compStatus(e) !== 'anulat').length, ''],
+              ['fara_pm', 'Fără PM', evLuna.filter(faraPm).length, evLuna.some(faraPm) ? 'text-[#B4332E]' : ''],
+              ['organizare', 'În organizare', evLuna.filter(inOrganizare).length, ''],
+              ['definalizat', 'De finalizat', evenimenteVizibile.filter(deFinalizat).length, evenimenteVizibile.some(deFinalizat) ? 'text-[#B4332E]' : ''],
+            ].map(([cod, eticheta, n, culoare]) => (
+              <button
+                key={eticheta}
+                type="button"
+                aria-pressed={cardFiltru === cod}
+                onClick={() => { setCardFiltru(cod && cardFiltru === cod ? null : cod); setZiuaSelectata(null) }}
+                title={cod ? 'Filtrează evenimentele din dreapta' : 'Arată toate evenimentele lunii'}
+                className={`flex items-baseline justify-between gap-3 rounded-[14px] border bg-white px-4 py-2.5 text-left transition hover:border-[#9AA6B8] ${cardFiltru === cod ? 'border-accent ring-2 ring-accent/25' : 'border-[#E1E4EA]'}`}
+              >
+                <span className="text-xs font-semibold text-[#5B6578]">{eticheta}</span>
+                <span className={`text-[26px] font-extrabold leading-none tracking-tight ${culoare}`}>{n}</span>
+              </button>
+            ))}
           </div>
         )}
 
@@ -285,7 +374,7 @@ export default function CalendarView({ canManageCalendar, canSeeStatistici }) {
             <div className="bg-white rounded-2xl shadow-sm p-5">
               <div className="mb-3 flex items-center justify-between">
                 <p className="font-display text-sm font-semibold text-slate-800">
-                  {ziuaSelectata ? formatData(ziuaSelectata) : `Evenimentele lunii ${LUNI[lunaCurenta.getMonth()].toLowerCase()}`}
+                  {ziuaSelectata ? formatData(ziuaSelectata) : cardFiltru ? `${caracteristiciCard[cardFiltru].nume}${cardFiltru === 'definalizat' ? '' : ` · ${LUNI[lunaCurenta.getMonth()].toLowerCase()}`}` : `Evenimentele lunii ${LUNI[lunaCurenta.getMonth()].toLowerCase()}`}
                 </p>
                 {ziuaSelectata && (
                   <button onClick={() => setZiuaSelectata(null)} className="text-xs text-accent hover:underline">
@@ -295,7 +384,7 @@ export default function CalendarView({ canManageCalendar, canSeeStatistici }) {
               </div>
 
               {evenimenteAfisate.length === 0 ? (
-                <p className="text-sm text-slate-400">Niciun eveniment.</p>
+                <p className="text-sm text-slate-400">{cardFiltru ? 'Niciun eveniment pentru acest filtru.' : 'Niciun eveniment.'}</p>
               ) : (
                 <div className="space-y-2">
                   {evenimenteAfisate.map((e) => {
@@ -316,19 +405,60 @@ export default function CalendarView({ canManageCalendar, canSeeStatistici }) {
                               {e.locatie ? ` · ${e.locatie}` : ''}
                               {e.localitate ? ` · ${e.localitate}${e.judet && e.judet !== e.localitate && e.judet !== 'În afara României' ? `, ${e.judet}` : ''}` : ''}
                             </p>
-                            {(pmNume.length > 0 || e.organizator) && (
-                              <p className="text-xs text-slate-400 mt-0.5">
-                                {pmNume.length > 0 && `PM: ${pmNume.join(', ')}`}
-                                {pmNume.length > 0 && e.organizator ? ' · ' : ''}
-                                {e.organizator && `Organizator: ${e.organizator}`}
-                              </p>
-                            )}
+                            <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs">
+                              {pmNume.length > 0 ? (
+                                <span className="text-slate-400">PM: <span className="text-slate-600">{pmNume.join(', ')}</span></span>
+                              ) : (
+                                !anulat && <span className="rounded-full border border-dashed border-amber-500 bg-amber-50 px-2 py-0.5 font-semibold text-amber-800">Fără PM</span>
+                              )}
+                              {canManageCalendar && !anulat && (
+                                <button type="button" onClick={() => setPmDeschis(pmDeschis === e.id ? null : e.id)} className="rounded-full px-2 py-0.5 font-semibold text-accent hover:bg-accent/10">
+                                  {pmNume.length > 0 ? 'Schimbă PM' : '+ Alocă PM'}
+                                </button>
+                              )}
+                              {e.organizator && <span className="text-slate-400">{pmNume.length > 0 || !anulat ? '· ' : ''}Organizator: {e.organizator}</span>}
+                            </div>
                           </div>
                           <div className="flex shrink-0 flex-col items-end gap-1">
-                            {status && <Chip c={status.culoare}>{status.nume}</Chip>}
+                            {status && poateSchimbaStatus(e) ? (
+                              <select
+                                value={e.status}
+                                onChange={(ev) => cereStatus(e, ev.target.value)}
+                                aria-label={`Status: ${e.nume}`}
+                                title="Schimbă statusul"
+                                className="cursor-pointer rounded-full border-0 py-0.5 pl-2 pr-1 text-[11px] font-semibold"
+                                style={{ backgroundColor: `${status.culoare}26`, color: culoareText(status.culoare) }}
+                              >
+                                {statusuri.map((s) => <option key={s.cod} value={s.cod}>{s.nume}</option>)}
+                              </select>
+                            ) : (
+                              status && <Chip c={status.culoare}>{status.nume}</Chip>
+                            )}
                             {implC && <Chip c={implC}>{e.implicare}</Chip>}
                           </div>
                         </div>
+
+                        {confirmStatus?.id === e.id && (
+                          <div className="mt-2 rounded-lg bg-amber-50 p-2.5 text-xs text-amber-900">
+                            <p>
+                              {statusDupaCod[confirmStatus.status]?.comportament === 'anulat'
+                                ? `Marchezi „${e.nume}" ca ${statusDupaCod[confirmStatus.status]?.nume}? Invitațiile și taskurile evenimentului vor fi înghețate.`
+                                : `Marchezi „${e.nume}" ca ${statusDupaCod[confirmStatus.status]?.nume}? Evenimentul poate primi apoi raport post-eveniment.`}
+                            </p>
+                            <div className="mt-2 flex gap-2">
+                              <button type="button" onClick={() => schimbaStatus(e, confirmStatus.status)} className="rounded-lg bg-accent px-3 py-1 font-semibold text-white hover:bg-accent-hover">Confirmă</button>
+                              <button type="button" onClick={() => setConfirmStatus(null)} className="rounded-lg px-3 py-1 font-semibold text-accent hover:bg-white">Renunță</button>
+                            </div>
+                          </div>
+                        )}
+                        {eroareCard?.id === e.id && <p className="mt-2 text-xs text-rose-600">{eroareCard.msg}</p>}
+                        {pmDeschis === e.id && canManageCalendar && (
+                          <div className="mt-2 rounded-lg bg-slate-50 p-2.5">
+                            <p className="mb-1.5 text-xs font-medium text-slate-600">PM / coordonator eveniment</p>
+                            <AngajatiPicker angajati={angajati} valoare={e.pm} onChange={(v) => salveazaPm(e, v)} placeholder="Caută un coleg…" />
+                            <button type="button" onClick={() => setPmDeschis(null)} className="mt-2 text-xs font-semibold text-accent hover:underline">Gata</button>
+                          </div>
+                        )}
 
                         {e.tipuri.length > 0 && (
                           <div className="mt-2 flex flex-wrap items-center gap-1.5">

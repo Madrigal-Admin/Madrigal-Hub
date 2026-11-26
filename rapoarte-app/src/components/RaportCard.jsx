@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { History, Download } from 'lucide-react'
+import { History, Download, CalendarDays } from 'lucide-react'
 import { supabase } from '../supabaseClient'
 import { STARI } from '../lib/roluri'
 import { etichetaPerioada, formatData, formatDataOra } from '../lib/luni'
@@ -15,7 +15,7 @@ export function StareBadge({ stare }) {
  * Card cu un raport: antet, text, câmpuri suplimentare, istoric, descărcare Word.
  * Butoanele specifice (editează, aprobă etc.) vin din `actiuni`.
  */
-export default function RaportCard({ raport, contract, persoana, campuri, aratAutor, aratIntarziere, actiuni }) {
+export default function RaportCard({ raport, contract, persoana, campuri, aratAutor, aratIntarziere, actiuni, onSchimbaData }) {
   const [istoric, setIstoric] = useState(null)
   const [deschis, setDeschis] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -58,6 +58,12 @@ export default function RaportCard({ raport, contract, persoana, campuri, aratAu
             {contract?.obiect}
             {contract?.numar_contract ? ` · nr. ${contract.numar_contract}` : ''} · completat {formatData(raport.created_at)}
           </p>
+          {raport.data_document && (
+            <p className="text-xs text-slate-500">
+              Data pe document: <strong className="text-slate-700">{formatData(`${raport.data_document}T00:00:00`)}</strong>
+              <span className="text-slate-400"> (schimbată de admin; data completării rămâne în sistem)</span>
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-1.5">
           {aratIntarziere && raport.cu_intarziere && (
@@ -96,6 +102,11 @@ export default function RaportCard({ raport, contract, persoana, campuri, aratAu
 
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {actiuni}
+        {onSchimbaData && (
+          <button onClick={onSchimbaData} className={btnGhost}>
+            <CalendarDays size={14} /> Data pe document
+          </button>
+        )}
         {raport.stare === 'aprobat' && (
           <button onClick={descarca} disabled={busy} className={btnGhost}>
             <Download size={14} /> {busy ? 'Se generează…' : 'Descarcă Word'}

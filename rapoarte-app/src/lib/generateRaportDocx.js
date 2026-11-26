@@ -62,7 +62,8 @@ export async function descarcaRaportWord(raport, contract, persoana, campuri) {
     departament: contract.departament || '',
     NrContract: contract.numar_contract || '',
     activitati: raport.activitati || '',
-    dataT: formatData(raport.created_at),
+    // data de pe document: cea setată de admin (dacă există), altfel data completării
+    dataT: formatData(raport.data_document ? `${raport.data_document}T00:00:00` : raport.created_at),
   }
   for (const camp of campuri || []) {
     if (camp.marker) date[camp.marker] = valoareExtra(camp, raport.extra?.[camp.cod])
